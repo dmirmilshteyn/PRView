@@ -1,7 +1,13 @@
+import { useEffect, useState } from "react";
+import { createHighlighter } from "shiki";
 import { Link, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import pullRequests from "../artifacts/prs.json";
 
 const prDetails = import.meta.glob("../artifacts/pr/*/details.json", {
+  eager: true,
+  import: "default",
+});
+const prDiffs = import.meta.glob("../artifacts/pr/*/diff.json", {
   eager: true,
   import: "default",
 });
@@ -126,6 +132,7 @@ function PullRequestDetail() {
     .flatMap((category) => pullRequests[category.key] ?? [])
     .find((item) => String(item.number) === number);
   const details = prDetails[`../artifacts/pr/${number}/details.json`];
+  const diff = prDiffs[`../artifacts/pr/${number}/diff.json`];
 
   if (!pullRequest || !details) {
     return <Navigate replace to="/pull-requests" />;
@@ -201,8 +208,146 @@ function PullRequestDetail() {
           <dd>{details.filesChanged}</dd>
         </div>
       </dl>
+      <DiffViewer diff={diff} />
     </article>
   );
+}
+
+function DiffViewer({ diff }) {
+  const [reviewedFiles, setReviewedFiles] = useState({});
+  const [collapsedFiles, setCollapsedFiles] = useState({});
+
+  function setFileReviewed(path, reviewed) {
+    setReviewedFiles((current) => ({ ...current, [path]: reviewed }));
+    setCollapsedFiles((current) => ({ ...current, [path]: reviewed }));
+  }
+
+  function toggleFileCollapsed(path) {
+    setCollapsedFiles((current) => ({ ...current, [path]: !current[path] }));
+  }
+
+  return (
+    <section className="diff-section">
+      <div className="diff-heading">
+        <div>
+          <p className="eyebrow">Changes</p>
+          <h2>Files changed</h2>
+        </div>
+        <span className="total-count">{diff.files.length} file{diff.files.length === 1 ? "" : "s"}</span>
+      </div>
+      <div className="diff-files">
+        {diff.files.map((file) => (
+          <article className="diff-file" key={file.path}>
+            <header
+              className="diff-file-header"
+              role="button"
+              tabIndex={0}
+              aria-expanded={!(collapsedFiles[file.path] ?? false)}
+              onClick={() => toggleFileCollapsed(file.path)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  toggleFileCollapsed(file.path);
+                }
+              }}
+            >
+              <span className="file-path">{file.path}</span>
+              <div className="file-actions">
+                <span className="file-stats">
+                  <span className="additions">+{file.additions}</span>
+                  <span className="deletions">−{file.deletions}</span>
+                </span>
+                <label className="reviewed-toggle" onClick={(event) => event.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={reviewedFiles[file.path] ?? false}
+                    onChange={(event) => setFileReviewed(file.path, event.target.checked)}
+                  />
+                  <span>Reviewed</span>
+                </label>
+              </div>
+            </header>
+            {!collapsedFiles[file.path] &&
+              file.hunks.map((hunk) => (
+                <div className="diff-hunk" key={hunk.header}>
+                  <div className="hunk-header">{hunk.header}</div>
+                  <HighlightedDiffHunk filePath={file.path} lines={hunk.lines} />
+                </div>
+              ))}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function HighlightedDiffHunk({ filePath, lines }) {
+  const [highlightedLines, setHighlightedLines] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function highlight() {
+      const highlighter = await createHighlighter({
+        themes: ["github-dark"],
+        langs: ["javascript", "jsx", "typescript", "tsx", "json", "css", "markdown", "bash", "text"],
+      });
+      const source = lines
+        .map((line) => (line[0] === "+" || line[0] === "-" ? line.slice(1) : line))
+        .join("\n");
+      const language = getLanguage(filePath);
+      const tokens = highlighter.codeToTokens(source, { lang: language, theme: "github-dark" }).tokens;
+
+      if (!cancelled) {
+        setHighlightedLines(tokens);
+      }
+
+      highlighter.dispose();
+    }
+
+    highlight();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filePath, lines]);
+
+  return (
+    <pre>
+      {lines.map((line, index) => {
+        const marker = line[0] === "+" || line[0] === "-" ? line[0] : " ";
+        const lineClass = marker === "+" ? "added" : marker === "-" ? "removed" : "context";
+        const tokens = highlightedLines?.[index] ?? [{ content: marker === " " ? line : line.slice(1) }];
+
+        return (
+          <code className={`diff-line ${lineClass}`} key={`${filePath}-${index}`}>
+            <span className="line-marker">{marker}</span>
+            {tokens.map((token, tokenIndex) => (
+              <span key={`${filePath}-${index}-${tokenIndex}`} style={{ color: token.color }}>
+                {token.content}
+              </span>
+            ))}
+            {"\n"}
+          </code>
+        );
+      })}
+    </pre>
+  );
+}
+
+function getLanguage(filePath) {
+  const extension = filePath.split(".").pop();
+  const languages = {
+    css: "css",
+    md: "markdown",
+    json: "json",
+    js: "javascript",
+    jsx: "jsx",
+    ts: "typescript",
+    tsx: "tsx",
+  };
+
+  return languages[extension] ?? "text";
 }
 
 export default function App() {

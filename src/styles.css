@@ -23,7 +23,7 @@ a {
 
 .app-shell {
   min-height: 100vh;
-  background: radial-gradient(circle at 75% 0%, #163047 0, #0c1117 42rem);
+  background: radial-gradient(circle at 78% 0%, #17334a 0, #0c1117 40rem);
 }
 
 .topbar {
@@ -35,9 +35,25 @@ a {
 }
 
 .brand {
+  align-items: center;
+  display: flex;
   font-size: 1.25rem;
   font-weight: 750;
+  gap: 0.55rem;
   letter-spacing: -0.04em;
+}
+
+.brand-mark {
+  align-items: center;
+  background: #76d3b2;
+  border-radius: 0.3rem;
+  color: #0c1117;
+  display: inline-flex;
+  font-size: 1rem;
+  height: 1.4rem;
+  justify-content: center;
+  line-height: 1;
+  width: 1.4rem;
 }
 
 nav {
@@ -57,8 +73,15 @@ nav a.active {
 
 .content {
   margin: 0 auto;
-  max-width: 58rem;
-  padding: clamp(5rem, 15vh, 10rem) 1.25rem;
+  max-width: 72rem;
+  padding: clamp(3.5rem, 9vh, 6rem) clamp(1.25rem, 5vw, 5rem) 5rem;
+}
+
+.page-heading {
+  align-items: end;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .eyebrow {
@@ -66,34 +89,145 @@ nav a.active {
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.14em;
+  margin: 0;
   text-transform: uppercase;
 }
 
 h1 {
-  font-size: clamp(3rem, 8vw, 6.5rem);
+  font-size: clamp(2.6rem, 7vw, 5.5rem);
   letter-spacing: -0.08em;
   line-height: 0.95;
-  margin: 1rem 0;
-  max-width: 10ch;
+  margin: 0.8rem 0 0;
+}
+
+.total-count,
+.count {
+  color: #8c9baa;
+  font-size: 0.8rem;
+}
+
+.total-count {
+  border: 1px solid #2a3a48;
+  border-radius: 999px;
+  margin-bottom: 0.35rem;
+  padding: 0.45rem 0.75rem;
 }
 
 .lede {
   color: #9eabb8;
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   line-height: 1.6;
-  margin-bottom: 2rem;
-  max-width: 34rem;
+  margin: 1.5rem 0 3.5rem;
+  max-width: 38rem;
 }
 
-.button {
+.pr-groups {
+  display: grid;
+  gap: 2.6rem;
+}
+
+.group-heading {
+  border-bottom: 1px solid #22303d;
+  margin-bottom: 0.8rem;
+  padding-bottom: 0.75rem;
+}
+
+.group-title {
+  align-items: center;
+  display: flex;
+  gap: 0.65rem;
+}
+
+.group-title h2 {
+  font-size: 0.95rem;
+  font-weight: 650;
+  margin: 0;
+}
+
+.status-dot {
+  border-radius: 50%;
+  height: 0.55rem;
+  width: 0.55rem;
+}
+
+.status-dot.amber {
+  background: #e8b86a;
+}
+
+.status-dot.blue {
+  background: #70a9ed;
+}
+
+.status-dot.green {
   background: #76d3b2;
-  border-radius: 0.45rem;
-  color: #0c1117;
-  display: inline-block;
-  font-weight: 700;
-  padding: 0.8rem 1.1rem;
 }
 
-.button:hover {
-  background: #a2ebd0;
+.pr-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.pr-card {
+  background: rgba(19, 29, 39, 0.82);
+  border: 1px solid #253542;
+  border-radius: 0.55rem;
+  padding: 1.15rem 1.25rem;
+  transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.pr-card:hover {
+  background: #172633;
+  border-color: #47705f;
+  transform: translateY(-1px);
+}
+
+.pr-card-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.pr-number {
+  color: #76d3b2;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.external-link {
+  color: #718495;
+  font-size: 1.15rem;
+}
+
+.pr-card h3 {
+  font-size: 1.02rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin: 0.65rem 0 0.45rem;
+}
+
+.pr-card p,
+.empty-state {
+  color: #8c9baa;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.empty-state {
+  border: 1px dashed #2a3a48;
+  border-radius: 0.55rem;
+  padding: 1rem 1.25rem;
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .page-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }

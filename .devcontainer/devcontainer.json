@@ -1,0 +1,23 @@
+{
+  "name": "PRView",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "workspaceFolder": "/workspaces/PRView",
+  "forwardPorts": [9999],
+  "portsAttributes": {
+    "9999": {
+      "label": "Vite development server",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "postCreateCommand": "bun install --frozen-lockfile",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "oven.bun-vscode"
+      ]
+    }
+  }
+}

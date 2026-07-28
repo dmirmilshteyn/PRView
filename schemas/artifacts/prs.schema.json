@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://prview.local/schemas/artifacts/prs.schema.json",
+  "title": "PRView Pull Request Groups",
+  "type": "object",
+  "additionalProperties": {
+    "type": "array",
+    "items": {
+      "$ref": "#/$defs/pullRequestSummary"
+    }
+  },
+  "required": ["needsReview", "inProgress", "readyToMerge"],
+  "properties": {
+    "needsReview": { "$ref": "#/$defs/pullRequestList" },
+    "inProgress": { "$ref": "#/$defs/pullRequestList" },
+    "readyToMerge": { "$ref": "#/$defs/pullRequestList" }
+  },
+  "$defs": {
+    "pullRequestList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/pullRequestSummary" }
+    },
+    "pullRequestSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["number", "link", "title", "description"],
+      "properties": {
+        "number": { "type": "integer", "minimum": 1 },
+        "link": { "type": "string", "format": "uri" },
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" }
+      }
+    }
+  }
+}

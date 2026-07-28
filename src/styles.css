@@ -193,7 +193,7 @@ h1 {
   font-weight: 700;
 }
 
-.external-link {
+.card-arrow {
   color: #718495;
   font-size: 1.15rem;
 }
@@ -219,6 +219,110 @@ h1 {
   padding: 1rem 1.25rem;
 }
 
+.pr-detail {
+  max-width: 48rem;
+}
+
+.back-link {
+  color: #76d3b2;
+  display: inline-block;
+  font-size: 0.88rem;
+  margin-bottom: clamp(4rem, 12vh, 8rem);
+}
+
+.back-link:hover {
+  color: #a2ebd0;
+}
+
+.pr-detail h1 {
+  max-width: 15ch;
+}
+
+.detail-description {
+  color: #b2bec9;
+  font-size: clamp(1.15rem, 2vw, 1.4rem);
+  line-height: 1.65;
+  margin: 2rem 0 0;
+  max-width: 38rem;
+}
+
+.detail-grid {
+  border-bottom: 1px solid #22303d;
+  border-top: 1px solid #22303d;
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(4, 1fr);
+  margin-top: 3rem;
+  padding: 1.25rem 0;
+}
+
+.detail-stat {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.detail-stat span,
+.metadata-list dt {
+  color: #718495;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.detail-stat strong {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.detail-section {
+  margin-top: 2rem;
+}
+
+.detail-section h2 {
+  color: #8c9baa;
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.75rem;
+  text-transform: uppercase;
+}
+
+.labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.label {
+  background: #1b3340;
+  border: 1px solid #2c5360;
+  border-radius: 999px;
+  color: #a9d8d0;
+  font-size: 0.78rem;
+  padding: 0.35rem 0.65rem;
+}
+
+.metadata-list {
+  border-top: 1px solid #22303d;
+  display: grid;
+  gap: 1rem 2rem;
+  grid-template-columns: repeat(2, 1fr);
+  margin: 2rem 0 0;
+  padding-top: 1.5rem;
+}
+
+.metadata-list div {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.metadata-list dd {
+  color: #d6dfe7;
+  font-size: 0.9rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 560px) {
   .topbar {
     align-items: flex-start;
@@ -229,5 +333,10 @@ h1 {
   .page-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .detail-grid,
+  .metadata-list {
+    grid-template-columns: repeat(2, 1fr);
   }
 }

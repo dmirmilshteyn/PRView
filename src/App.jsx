@@ -6,10 +6,26 @@ import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 
 const categories = [
-  { key: "needsReview", label: "Needs review", accent: "amber" },
-  { key: "inProgress", label: "In progress", accent: "blue" },
-  { key: "readyToMerge", label: "Ready to merge", accent: "green" },
+  { key: "yourChanges", label: "Your changes", accent: "purple" },
+  { key: "needsYourReview", label: "Needs your review", accent: "amber", aliases: ["needsReview"] },
+  { key: "returnedToYou", label: "Returned to you", accent: "red" },
+  { key: "approved", label: "Approved", accent: "green", aliases: ["readyToMerge"] },
+  { key: "waitingForReviewers", label: "Waiting for reviewers", accent: "blue", aliases: ["inProgress"] },
+  { key: "drafts", label: "Drafts", accent: "slate" },
+  { key: "waitingForAuthor", label: "Waiting for author", accent: "orange" },
 ];
+
+function getCategoryItems(pullRequests, category) {
+  const keys = [category.key, ...(category.aliases ?? [])];
+
+  for (const key of keys) {
+    if (pullRequests[key]) {
+      return pullRequests[key];
+    }
+  }
+
+  return [];
+}
 
 function Layout({ pullRequests, prDetails, prDiffs }) {
   const pathname = usePathname();
@@ -65,7 +81,7 @@ function PullRequestGroups({ pullRequests }) {
   return (
     <div className="pr-groups">
       {categories.map((category) => {
-        const items = pullRequests[category.key] ?? [];
+        const items = getCategoryItems(pullRequests, category);
 
         return (
           <section className="pr-group" key={category.key}>
@@ -91,7 +107,7 @@ function PullRequestGroups({ pullRequests }) {
 }
 
 function Dashboard({ pullRequests }) {
-  const totalPullRequests = categories.reduce((total, category) => total + (pullRequests[category.key]?.length ?? 0), 0);
+  const totalPullRequests = categories.reduce((total, category) => total + getCategoryItems(pullRequests, category).length, 0);
 
   return (
     <section>
@@ -125,7 +141,7 @@ function PullRequests({ pullRequests }) {
 function PullRequestDetail({ pullRequests, prDetails, prDiffs }) {
   const { number } = useParams();
   const pullRequest = categories
-    .flatMap((category) => pullRequests[category.key] ?? [])
+    .flatMap((category) => getCategoryItems(pullRequests, category))
     .find((item) => String(item.number) === number);
   const details = prDetails[number];
   const diff = prDiffs[number];

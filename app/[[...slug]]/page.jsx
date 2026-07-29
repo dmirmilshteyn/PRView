@@ -13,9 +13,13 @@ function readJson(filePath, fallback) {
 function loadReviewData() {
   const artifactsPath = path.join(process.cwd(), "artifacts");
   const prs = readJson(path.join(artifactsPath, "prs.json"), {
-    needsReview: [],
-    inProgress: [],
-    readyToMerge: [],
+    yourChanges: [],
+    needsYourReview: [],
+    returnedToYou: [],
+    approved: [],
+    waitingForReviewers: [],
+    drafts: [],
+    waitingForAuthor: [],
   });
   const prDetails = {};
   const prDiffs = {};

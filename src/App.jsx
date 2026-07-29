@@ -64,7 +64,7 @@ function Layout({ pullRequests, prDetails, prDiffs }) {
 
 function PullRequestCard({ pullRequest }) {
   return (
-    <Link className="pr-card" href={`/pull-requests/${pullRequest.number}`}>
+    <Link className="pr-card" href={`/pull-requests/${pullRequest.number}/info`}>
       <div className="pr-card-header">
         <span className="pr-number">#{pullRequest.number}</span>
         <span className="card-arrow" aria-hidden="true">
@@ -140,7 +140,9 @@ function PullRequests({ pullRequests }) {
 
 function PullRequestDetail({ pullRequests, prDetails, prDiffs }) {
   const pathname = usePathname();
-  const number = pathname.split("/").pop();
+  const pathSegments = pathname.split("/").filter(Boolean);
+  const number = pathSegments[1];
+  const activeTab = pathSegments[2] === "code" ? "code" : "info";
   const pullRequest = categories
     .flatMap((category) => getCategoryItems(pullRequests, category))
     .find((item) => String(item.number) === number);
@@ -161,75 +163,108 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs }) {
 
   return (
     <article className="pr-detail">
-      <Link className="back-link" href="/pull-requests">
-        ← Back to pull requests
-      </Link>
-      <p className="eyebrow">Pull request #{pullRequest.number}</p>
+      <div className="detail-kicker">
+        <Link className="back-link" href="/pull-requests" aria-label="Back to pull requests">
+          ←
+        </Link>
+        <p className="eyebrow">Pull request #{pullRequest.number}</p>
+      </div>
       <h1>{details.title}</h1>
       <p className="detail-description">{details.description}</p>
-      <div className="detail-grid">
-        <div className="detail-stat">
-          <span>Author</span>
-          <strong>{details.author}</strong>
-        </div>
-        <div className="detail-stat">
-          <span>Opened</span>
-          <strong>{details.createdAt}</strong>
-        </div>
-        <div className="detail-stat">
-          <span>Updated</span>
-          <strong>{details.updatedAt}</strong>
-        </div>
-        <div className="detail-stat">
-          <span>Review</span>
-          <strong>{details.reviewDecision}</strong>
-        </div>
+      <div className="detail-tabs" role="tablist" aria-label="Pull request details">
+        <Link
+          className={activeTab === "info" ? "active" : ""}
+          href={`/pull-requests/${number}/info`}
+          id="info-tab"
+          role="tab"
+          aria-selected={activeTab === "info"}
+          aria-controls="info-panel"
+        >
+          Info
+        </Link>
+        <Link
+          className={activeTab === "code" ? "active" : ""}
+          href={`/pull-requests/${number}/code`}
+          id="code-tab"
+          role="tab"
+          aria-selected={activeTab === "code"}
+          aria-controls="code-panel"
+        >
+          Code
+        </Link>
       </div>
-      <div className="detail-section">
-        <h2>Labels</h2>
-        <div className="labels">
-          {details.labels.map((label) => (
-            <span className="label" key={label}>
-              {label}
-            </span>
-          ))}
+      {activeTab === "info" ? (
+        <div id="info-panel" role="tabpanel" aria-labelledby="info-tab">
+          <div className="detail-grid">
+            <div className="detail-stat">
+              <span>Author</span>
+              <strong>{details.author}</strong>
+            </div>
+            <div className="detail-stat">
+              <span>Opened</span>
+              <strong>{details.createdAt}</strong>
+            </div>
+            <div className="detail-stat">
+              <span>Updated</span>
+              <strong>{details.updatedAt}</strong>
+            </div>
+            <div className="detail-stat">
+              <span>Review</span>
+              <strong>{details.reviewDecision}</strong>
+            </div>
+          </div>
+          <dl className="metadata-list">
+            <div>
+              <dt>Labels</dt>
+              <dd>
+                <div className="labels">
+                  {details.labels.map((label) => (
+                    <span className="label" key={label}>
+                      {label}
+                    </span>
+                  ))}
+                </div>
+              </dd>
+            </div>
+            <div>
+              <dt>Repository</dt>
+              <dd>{details.repository}</dd>
+            </div>
+            <div>
+              <dt>Branch</dt>
+              <dd>{details.branch}</dd>
+            </div>
+            <div>
+              <dt>Base branch</dt>
+              <dd>{details.baseBranch}</dd>
+            </div>
+            <div>
+              <dt>Assignees</dt>
+              <dd>{details.assignees.join(", ")}</dd>
+            </div>
+            <div>
+              <dt>Milestone</dt>
+              <dd>{details.milestone}</dd>
+            </div>
+            <div>
+              <dt>Checks</dt>
+              <dd>{details.checks}</dd>
+            </div>
+            <div>
+              <dt>Changes</dt>
+              <dd>+{details.additions} / −{details.deletions}</dd>
+            </div>
+            <div>
+              <dt>Files changed</dt>
+              <dd>{details.filesChanged}</dd>
+            </div>
+          </dl>
         </div>
-      </div>
-      <dl className="metadata-list">
-        <div>
-          <dt>Repository</dt>
-          <dd>{details.repository}</dd>
+      ) : (
+        <div id="code-panel" role="tabpanel" aria-labelledby="code-tab">
+          <DiffViewer diff={diff} />
         </div>
-        <div>
-          <dt>Branch</dt>
-          <dd>{details.branch}</dd>
-        </div>
-        <div>
-          <dt>Base branch</dt>
-          <dd>{details.baseBranch}</dd>
-        </div>
-        <div>
-          <dt>Assignees</dt>
-          <dd>{details.assignees.join(", ")}</dd>
-        </div>
-        <div>
-          <dt>Milestone</dt>
-          <dd>{details.milestone}</dd>
-        </div>
-        <div>
-          <dt>Checks</dt>
-          <dd>{details.checks}</dd>
-        </div>
-        <div>
-          <dt>Changes</dt>
-          <dd>+{details.additions} / −{details.deletions}</dd>
-        </div>
-        <div>
-          <dt>Files changed</dt>
-          <dd>{details.filesChanged}</dd>
-        </div>
-      </dl>
-      <DiffViewer diff={diff} />
+      )}
     </article>
   );
 }

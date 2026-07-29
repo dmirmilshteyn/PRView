@@ -74,7 +74,7 @@ nav a.active {
 .content {
   margin: 0 auto;
   max-width: 72rem;
-  padding: clamp(3.5rem, 9vh, 6rem) clamp(1.25rem, 5vw, 5rem) 5rem;
+  padding: clamp(1rem, 3vh, 2rem) clamp(1.25rem, 5vw, 5rem) 5rem;
 }
 
 .content-wide {
@@ -251,16 +251,31 @@ h1 {
   color: #76d3b2;
   display: inline-block;
   font-size: 0.88rem;
-  margin-bottom: clamp(4rem, 12vh, 8rem);
 }
 
 .back-link:hover {
   color: #a2ebd0;
 }
 
+.detail-kicker {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 0;
+}
+
+.detail-kicker .back-link {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.detail-kicker + h1 {
+  margin-top: 0;
+}
+
 .pr-detail h1 {
   font-size: clamp(2.25rem, 4.5vw, 4rem);
-  max-width: 18ch;
+  max-width: none;
 }
 
 .detail-description {
@@ -271,13 +286,36 @@ h1 {
   max-width: 38rem;
 }
 
+.detail-tabs {
+  border-bottom: 1px solid #22303d;
+  display: flex;
+  gap: 2rem;
+  margin-top: 2.5rem;
+}
+
+.detail-tabs a {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: #718495;
+  cursor: pointer;
+  font: inherit;
+  font-size: 1rem;
+  padding: 0 0 1rem;
+}
+
+.detail-tabs a:hover,
+.detail-tabs a.active {
+  border-bottom-color: #76d3b2;
+  color: #76d3b2;
+}
+
 .detail-grid {
   border-bottom: 1px solid #22303d;
-  border-top: 1px solid #22303d;
   display: grid;
   gap: 1.25rem;
   grid-template-columns: repeat(4, 1fr);
-  margin-top: 3rem;
+  margin-top: 0.75rem;
   padding: 1.25rem 0;
 }
 
@@ -318,6 +356,10 @@ h1 {
   gap: 0.45rem;
 }
 
+.metadata-list .labels {
+  display: flex;
+}
+
 .label {
   background: #1b3340;
   border: 1px solid #2c5360;
@@ -325,10 +367,10 @@ h1 {
   color: #a9d8d0;
   font-size: 0.78rem;
   padding: 0.35rem 0.65rem;
+  width: fit-content;
 }
 
 .metadata-list {
-  border-top: 1px solid #22303d;
   display: grid;
   gap: 1rem 2rem;
   grid-template-columns: repeat(2, 1fr);
@@ -349,7 +391,7 @@ h1 {
 }
 
 .diff-section {
-  margin-top: 4rem;
+  margin-top: 1.5rem;
 }
 
 .diff-heading {

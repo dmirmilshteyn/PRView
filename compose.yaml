@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: .devcontainer/Dockerfile
     working_dir: /workspaces/PRView
-    command: bun run dev
+    command: sh -lc "bun install --frozen-lockfile && bun run dev"
     ports:
       - "9999:9999"
     volumes:

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createHighlighter } from "shiki";
 import Link from "next/link";
-import { useParams, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 const categories = [
   { key: "yourChanges", label: "Your changes", accent: "purple" },
@@ -49,7 +49,7 @@ function Layout({ pullRequests, prDetails, prDiffs }) {
         </nav>
       </header>
 
-      <main className="content">
+      <main className={`content ${isDetailPage ? "content-wide" : ""}`}>
         {isDetailPage ? (
           <PullRequestDetail pullRequests={pullRequests} prDetails={prDetails} prDiffs={prDiffs} />
         ) : isPullRequestsPage ? (
@@ -139,7 +139,8 @@ function PullRequests({ pullRequests }) {
 }
 
 function PullRequestDetail({ pullRequests, prDetails, prDiffs }) {
-  const { number } = useParams();
+  const pathname = usePathname();
+  const number = pathname.split("/").pop();
   const pullRequest = categories
     .flatMap((category) => getCategoryItems(pullRequests, category))
     .find((item) => String(item.number) === number);

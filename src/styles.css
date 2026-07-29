@@ -77,6 +77,10 @@ nav a.active {
   padding: clamp(3.5rem, 9vh, 6rem) clamp(1.25rem, 5vw, 5rem) 5rem;
 }
 
+.content-wide {
+  max-width: none;
+}
+
 .page-heading {
   align-items: end;
   display: flex;
@@ -240,7 +244,7 @@ h1 {
 }
 
 .pr-detail {
-  max-width: 48rem;
+  max-width: none;
 }
 
 .back-link {

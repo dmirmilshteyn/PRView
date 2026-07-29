@@ -34,21 +34,14 @@ function Layout({ pullRequests, prDetails, prDiffs }) {
 
   return (
     <div className="app-shell">
-      <header className="topbar">
-        <Link className="brand" href="/">
-          <span className="brand-mark">+</span>
-          PRView
+      <nav className="main-nav" aria-label="Main navigation">
+        <Link className={pathname === "/" ? "active" : ""} href="/">
+          Dashboard
         </Link>
-        <nav aria-label="Main navigation">
-          <Link className={pathname === "/" ? "active" : ""} href="/">
-            Dashboard
-          </Link>
-          <Link className={isPullRequestsPage || isDetailPage ? "active" : ""} href="/pull-requests">
-            Pull requests
-          </Link>
-        </nav>
-      </header>
-
+        <Link className={isPullRequestsPage || isDetailPage ? "active" : ""} href="/pull-requests">
+          Pull requests
+        </Link>
+      </nav>
       <main className={`content ${isDetailPage ? "content-wide" : ""}`}>
         {isDetailPage ? (
           <PullRequestDetail pullRequests={pullRequests} prDetails={prDetails} prDiffs={prDiffs} />

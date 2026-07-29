@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createHighlighter } from "shiki";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -255,7 +255,7 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs }) {
         </div>
       ) : (
         <div id="code-panel" role="tabpanel" aria-labelledby="code-tab">
-          <DiffViewer diff={diff} />
+          <DiffViewer diff={diff} pullRequestNumber={pullRequest.number} />
         </div>
       )}
     </article>
@@ -323,11 +323,215 @@ function FileSidebar({ files, selectedFile, onSelectFile }) {
   );
 }
 
-function DiffViewer({ diff }) {
+function formatCommentDate(value) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function CommentComposer({ filePath, draft, submitting, onToggle, onDraftChange, onSubmit }) {
+  return (
+    <div className="comment-composer">
+      <div className="comment-composer-header">
+        <span>⌄ &nbsp;Draft thread on file</span>
+        <button type="button" onClick={onToggle}>
+          × Discard
+        </button>
+      </div>
+      <div className="comment-composer-body">
+        <textarea
+          aria-label={`Comment on ${filePath}`}
+          placeholder="Write a comment..."
+          value={draft}
+          onChange={(event) => onDraftChange(event.target.value)}
+        />
+        <div className="comment-composer-footer">
+          <span className="comment-tools">⌕ &nbsp;⊞</span>
+          <button type="button" disabled={submitting || !draft.trim()} onClick={onSubmit}>
+            {submitting ? "Posting..." : "Comment"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CommentThread({ comments, pullRequestNumber, filePath, onCommentAdded }) {
+  const [reply, setReply] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [replyOpen, setReplyOpen] = useState(false);
+  const replyInputRef = useRef(null);
+
+  useEffect(() => {
+    if (replyOpen) {
+      replyInputRef.current?.focus();
+    }
+  }, [replyOpen]);
+
+  if (comments.length === 0) {
+    return null;
+  }
+
+  async function submitReply() {
+    const body = reply.trim();
+
+    if (!body) {
+      return;
+    }
+
+    setSubmitting(true);
+    const response = await fetch("/api/comments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pullRequestNumber,
+        filePath,
+        body,
+        parentId: comments[comments.length - 1].id,
+      }),
+    });
+
+    if (response.ok) {
+      onCommentAdded(await response.json());
+      setReply("");
+    }
+
+    setSubmitting(false);
+  }
+
+  return (
+    <div className="comment-thread">
+      {comments.map((comment) => (
+        <div className="file-comment" key={comment.id}>
+          <div className="file-comment-meta">
+            <strong>{comment.author}</strong>
+            <span>{formatCommentDate(comment.createdAt)}</span>
+          </div>
+          <p>{comment.body}</p>
+        </div>
+      ))}
+      <div className="reply-block">
+        <span className="comment-avatar" aria-hidden="true">Y</span>
+        {!replyOpen ? (
+          <button className="reply-preview" type="button" onClick={() => setReplyOpen(true)}>
+            Reply
+          </button>
+        ) : (
+          <div
+            className="reply-editor"
+            onBlur={(event) => {
+              const composer = event.currentTarget;
+
+              setTimeout(() => {
+                if (!reply.trim() && !composer.contains(document.activeElement)) {
+                  setReplyOpen(false);
+                }
+              }, 0);
+            }}
+          >
+            <textarea
+              ref={replyInputRef}
+              aria-label={`Reply to comments on ${filePath}`}
+              placeholder="Reply"
+              value={reply}
+              onChange={(event) => setReply(event.target.value)}
+            />
+            <div className="reply-toolbar">
+              <label className="review-checkbox" onMouseDown={(event) => event.preventDefault()}>
+                <input type="checkbox" />
+                <span>Add to review</span>
+              </label>
+              <button
+                className="reply-submit"
+                type="button"
+                aria-label="Post reply"
+                disabled={submitting || !reply.trim()}
+                onClick={submitReply}
+              >
+                ↑
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FileCommentThread({
+  filePath,
+  comments,
+  pullRequestNumber,
+  commentOpen,
+  draft,
+  submitting,
+  onToggle,
+  onDraftChange,
+  onSubmit,
+  onCommentAdded,
+}) {
+  const fileComments = comments.filter((comment) => comment.filePath === filePath);
+
+  if (!commentOpen && fileComments.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="file-comments">
+      <CommentThread
+        comments={fileComments}
+        pullRequestNumber={pullRequestNumber}
+        filePath={filePath}
+        onCommentAdded={onCommentAdded}
+      />
+      {commentOpen && (
+        <CommentComposer
+          filePath={filePath}
+          draft={draft}
+          submitting={submitting}
+          onToggle={onToggle}
+          onDraftChange={onDraftChange}
+          onSubmit={onSubmit}
+        />
+      )}
+    </div>
+  );
+}
+
+function DiffViewer({ diff, pullRequestNumber }) {
   const [reviewedFiles, setReviewedFiles] = useState({});
   const [collapsedFiles, setCollapsedFiles] = useState({});
   const [selectedFile, setSelectedFile] = useState(diff.files[0]?.path ?? null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [comments, setComments] = useState([]);
+  const [draftComments, setDraftComments] = useState({});
+  const [submittingFile, setSubmittingFile] = useState(null);
+  const [commentOpenFiles, setCommentOpenFiles] = useState({});
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadComments() {
+      const response = await fetch(`/api/comments?pr=${pullRequestNumber}`);
+
+      if (response.ok && !cancelled) {
+        setComments(await response.json());
+      }
+    }
+
+    loadComments();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pullRequestNumber]);
 
   function setFileReviewed(path, reviewed) {
     setReviewedFiles((current) => ({ ...current, [path]: reviewed }));
@@ -341,6 +545,33 @@ function DiffViewer({ diff }) {
   function selectFile(path, index) {
     setSelectedFile(path);
     document.getElementById(`diff-file-${index}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function toggleCommentComposer(path) {
+    setCommentOpenFiles((current) => ({ ...current, [path]: !current[path] }));
+  }
+
+  async function submitComment(path) {
+    const body = draftComments[path]?.trim();
+
+    if (!body) {
+      return;
+    }
+
+    setSubmittingFile(path);
+    const response = await fetch("/api/comments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pullRequestNumber, filePath: path, body }),
+    });
+
+    if (response.ok) {
+      const comment = await response.json();
+      setComments((current) => [...current, comment]);
+      setDraftComments((current) => ({ ...current, [path]: "" }));
+    }
+
+    setSubmittingFile(null);
   }
 
   return (
@@ -373,6 +604,18 @@ function DiffViewer({ diff }) {
             >
               <span className="file-path">{file.path}</span>
               <div className="file-actions">
+                <button
+                  className="file-comment-toggle"
+                  type="button"
+                  aria-label={`Comment on ${file.path}`}
+                  aria-expanded={commentOpenFiles[file.path] ?? false}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    toggleCommentComposer(file.path);
+                  }}
+                >
+                  +
+                </button>
                 <span className="file-stats">
                   <span className="additions">+{file.additions}</span>
                   <span className="deletions">−{file.deletions}</span>
@@ -387,6 +630,18 @@ function DiffViewer({ diff }) {
                 </label>
               </div>
             </header>
+            <FileCommentThread
+              filePath={file.path}
+              comments={comments}
+              pullRequestNumber={pullRequestNumber}
+              commentOpen={commentOpenFiles[file.path] ?? false}
+              draft={draftComments[file.path] ?? ""}
+              submitting={submittingFile === file.path}
+              onToggle={() => toggleCommentComposer(file.path)}
+              onDraftChange={(body) => setDraftComments((current) => ({ ...current, [file.path]: body }))}
+              onSubmit={() => submitComment(file.path)}
+              onCommentAdded={(comment) => setComments((current) => [...current, comment])}
+            />
             {!collapsedFiles[file.path] &&
               file.hunks.map((hunk) => (
                 <div className="diff-hunk" key={hunk.header}>

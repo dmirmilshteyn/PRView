@@ -269,9 +269,72 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs }) {
   );
 }
 
+function SidebarTabs({ sidebarOpen, onToggleSidebar }) {
+  return (
+    <div className="sidebar-tabs" role="tablist" aria-label="Code navigation tabs">
+      <button
+        className="sidebar-toggle"
+        type="button"
+        aria-label={sidebarOpen ? "Hide files sidebar" : "Show files sidebar"}
+        aria-expanded={sidebarOpen}
+        onClick={onToggleSidebar}
+      >
+        ◧
+      </button>
+      <button className="active" role="tab" aria-selected="true">
+        Files
+      </button>
+      <button className="sidebar-tab-disabled" disabled role="tab" aria-selected="false">
+        Tour
+      </button>
+    </div>
+  );
+}
+
+function FileSidebar({ files, selectedFile, onSelectFile }) {
+  const [query, setQuery] = useState("");
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleFiles = files.filter((file) => file.path.toLowerCase().includes(normalizedQuery));
+
+  return (
+    <aside className="diff-sidebar" aria-label="Code navigation">
+      <div className="file-tree" role="tabpanel">
+        <label className="file-search">
+          <span aria-hidden="true">⌕</span>
+          <input
+            type="search"
+            aria-label="Search changed files"
+            placeholder="Search files"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </label>
+        <div className="file-tree-root">⌁ <span>Changed files</span></div>
+        {visibleFiles.map((file) => (
+          <button
+            className={`file-tree-item ${selectedFile === file.path ? "active" : ""}`}
+            key={file.path}
+            onClick={() => onSelectFile(file.path, files.indexOf(file))}
+          >
+            <span className="file-tree-icon">▱</span>
+            <span className="file-tree-name">{file.path}</span>
+            <span className="file-tree-stats">
+              <span className="additions">+{file.additions}</span>
+              {file.deletions > 0 && <span className="deletions"> −{file.deletions}</span>}
+            </span>
+          </button>
+        ))}
+        {visibleFiles.length === 0 && <p className="file-tree-empty">No matching files.</p>}
+      </div>
+    </aside>
+  );
+}
+
 function DiffViewer({ diff }) {
   const [reviewedFiles, setReviewedFiles] = useState({});
   const [collapsedFiles, setCollapsedFiles] = useState({});
+  const [selectedFile, setSelectedFile] = useState(diff.files[0]?.path ?? null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   function setFileReviewed(path, reviewed) {
     setReviewedFiles((current) => ({ ...current, [path]: reviewed }));
@@ -282,18 +345,26 @@ function DiffViewer({ diff }) {
     setCollapsedFiles((current) => ({ ...current, [path]: !current[path] }));
   }
 
+  function selectFile(path, index) {
+    setSelectedFile(path);
+    document.getElementById(`diff-file-${index}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <section className="diff-section">
-      <div className="diff-heading">
-        <div>
-          <p className="eyebrow">Changes</p>
-          <h2>Files changed</h2>
-        </div>
-        <span className="total-count">{diff.files.length} file{diff.files.length === 1 ? "" : "s"}</span>
-      </div>
-      <div className="diff-files">
-        {diff.files.map((file) => (
-          <article className="diff-file" key={file.path}>
+      <SidebarTabs sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen((current) => !current)} />
+      <div className={`diff-layout ${sidebarOpen ? "" : "sidebar-hidden"}`}>
+        {sidebarOpen && (
+          <FileSidebar
+            files={diff.files}
+            selectedFile={selectedFile}
+            onSelectFile={selectFile}
+            onToggleSidebar={() => setSidebarOpen(false)}
+          />
+        )}
+        <div className="diff-files">
+          {diff.files.map((file, index) => (
+          <article className={`diff-file ${selectedFile === file.path ? "selected" : ""}`} id={`diff-file-${index}`} key={file.path}>
             <header
               className="diff-file-header"
               role="button"
@@ -331,7 +402,8 @@ function DiffViewer({ diff }) {
                 </div>
               ))}
           </article>
-        ))}
+          ))}
+        </div>
       </div>
     </section>
   );

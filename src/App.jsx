@@ -177,7 +177,11 @@ function PullRequestDetail() {
       <dl className="metadata-list">
         <div>
           <dt>Repository</dt>
-          <dd>{details.repository}</dd>
+          <dd>
+            <a href={details.link} rel="noreferrer" target="_blank">
+              {details.repository} ↗
+            </a>
+          </dd>
         </div>
         <div>
           <dt>Branch</dt>

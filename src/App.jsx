@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createHighlighter } from "shiki";
 import { Link, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import pullRequests from "../artifacts/prs.json";
+import { getLanguage } from "./review/review-model";
 
 const prDetails = import.meta.glob("../artifacts/pr/*/details.json", {
   eager: true,
@@ -333,21 +334,6 @@ function HighlightedDiffHunk({ filePath, lines }) {
       })}
     </pre>
   );
-}
-
-function getLanguage(filePath) {
-  const extension = filePath.split(".").pop();
-  const languages = {
-    css: "css",
-    md: "markdown",
-    json: "json",
-    js: "javascript",
-    jsx: "jsx",
-    ts: "typescript",
-    tsx: "tsx",
-  };
-
-  return languages[extension] ?? "text";
 }
 
 export default function App() {

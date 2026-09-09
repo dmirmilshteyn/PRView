@@ -5,6 +5,10 @@
     "context": ".."
   },
   "workspaceFolder": "/workspaces/PRView",
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {},
+    "ghcr.io/devcontainer-community/devcontainer-features/astral.sh-uv:1": {}
+  },
   "forwardPorts": [9999],
   "portsAttributes": {
     "9999": {

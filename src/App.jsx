@@ -3,6 +3,7 @@ import { createHighlighter } from "shiki";
 import { Link, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import pullRequests from "../artifacts/prs.json";
 import { getLanguage } from "./review/review-model";
+import { useReviewState } from "./review/use-review-state";
 
 const prDetails = import.meta.glob("../artifacts/pr/*/details.json", {
   eager: true,
@@ -209,23 +210,18 @@ function PullRequestDetail() {
           <dd>{details.filesChanged}</dd>
         </div>
       </dl>
-      <DiffViewer diff={diff} />
+      <DiffViewer diff={diff} key={number} pullRequestNumber={number} />
     </article>
   );
 }
 
-function DiffViewer({ diff }) {
-  const [reviewedFiles, setReviewedFiles] = useState({});
-  const [collapsedFiles, setCollapsedFiles] = useState({});
-
-  function setFileReviewed(path, reviewed) {
-    setReviewedFiles((current) => ({ ...current, [path]: reviewed }));
-    setCollapsedFiles((current) => ({ ...current, [path]: reviewed }));
-  }
-
-  function toggleFileCollapsed(path) {
-    setCollapsedFiles((current) => ({ ...current, [path]: !current[path] }));
-  }
+function DiffViewer({ diff, pullRequestNumber }) {
+  const {
+    collapsedFiles,
+    reviewedFiles,
+    setFileReviewed,
+    toggleFileCollapsed,
+  } = useReviewState(pullRequestNumber);
 
   return (
     <section className="diff-section">

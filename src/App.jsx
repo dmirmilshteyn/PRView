@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createHighlighter } from "shiki";
 import { Link, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import pullRequests from "../artifacts/prs.json";
+import FileNavigator, { getFileAnchor } from "./review/FileNavigator";
 import { getLanguage } from "./review/review-model";
 import ReviewProgress from "./review/ReviewProgress";
 import { useReviewState } from "./review/use-review-state";
@@ -235,9 +236,11 @@ function DiffViewer({ diff, pullRequestNumber }) {
         <span className="total-count">{diff.files.length} file{diff.files.length === 1 ? "" : "s"}</span>
       </div>
       <ReviewProgress files={diff.files} onReset={resetReview} reviewedFiles={reviewedFiles} />
-      <div className="diff-files">
-        {diff.files.map((file) => (
-          <article className="diff-file" key={file.path}>
+      <div className="review-workspace">
+        <FileNavigator files={diff.files} reviewedFiles={reviewedFiles} />
+        <div className="diff-files">
+        {diff.files.map((file, index) => (
+          <article className="diff-file" id={getFileAnchor(index)} key={file.path}>
             <header
               className="diff-file-header"
               role="button"
@@ -276,6 +279,7 @@ function DiffViewer({ diff, pullRequestNumber }) {
               ))}
           </article>
         ))}
+        </div>
       </div>
     </section>
   );

@@ -341,10 +341,14 @@ function getLanguage(filePath) {
     css: "css",
     md: "markdown",
     json: "json",
+    py: "python",
+    sh: "bash",
     js: "javascript",
     jsx: "jsx",
     ts: "typescript",
     tsx: "tsx",
+    yaml: "yaml",
+    yml: "yaml",
   };
 
   return languages[extension] ?? "text";

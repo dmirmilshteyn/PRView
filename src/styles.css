@@ -458,6 +458,59 @@ h1 {
   opacity: 0.45;
 }
 
+.review-toolbar {
+  align-items: end;
+  border-bottom: 1px solid #22303d;
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding-bottom: 1rem;
+}
+
+.review-toolbar label {
+  display: grid;
+  flex: 1;
+  gap: 0.35rem;
+}
+
+.review-toolbar label > span,
+.review-filter-count {
+  color: #718495;
+  font-size: 0.7rem;
+}
+
+.review-toolbar input {
+  background: #101921;
+  border: 1px solid #2a3a48;
+  border-radius: 0.4rem;
+  color: #d6dfe7;
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.55rem 0.7rem;
+  width: 100%;
+}
+
+.review-toolbar input:focus-visible {
+  border-color: #76d3b2;
+  outline: none;
+}
+
+.review-toolbar button {
+  background: #172633;
+  border: 1px solid #2a3a48;
+  border-radius: 0.4rem;
+  color: #d6dfe7;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 0.55rem 0.7rem;
+}
+
+.review-toolbar button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 .diff-file {
   background: #101921;
   border: 1px solid #253542;
@@ -615,6 +668,15 @@ h1 {
 
   .review-workspace {
     grid-template-columns: 1fr;
+  }
+
+  .review-toolbar {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .review-toolbar label {
+    flex-basis: 100%;
   }
 
   .file-navigator {

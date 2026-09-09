@@ -5,6 +5,7 @@ import pullRequests from "../artifacts/prs.json";
 import FileNavigator, { getFileAnchor } from "./review/FileNavigator";
 import { getLanguage } from "./review/review-model";
 import ReviewProgress from "./review/ReviewProgress";
+import ReviewToolbar from "./review/ReviewToolbar";
 import { useReviewState } from "./review/use-review-state";
 
 const prDetails = import.meta.glob("../artifacts/pr/*/details.json", {
@@ -218,6 +219,7 @@ function PullRequestDetail() {
 }
 
 function DiffViewer({ diff, pullRequestNumber }) {
+  const [fileQuery, setFileQuery] = useState("");
   const {
     collapsedFiles,
     resetReview,
@@ -225,6 +227,10 @@ function DiffViewer({ diff, pullRequestNumber }) {
     setFileReviewed,
     toggleFileCollapsed,
   } = useReviewState(pullRequestNumber);
+  const normalizedQuery = fileQuery.trim().toLowerCase();
+  const visibleFiles = diff.files
+    .map((file, index) => ({ file, index }))
+    .filter(({ file }) => file.path.toLowerCase().includes(normalizedQuery));
 
   return (
     <section className="diff-section">
@@ -236,10 +242,16 @@ function DiffViewer({ diff, pullRequestNumber }) {
         <span className="total-count">{diff.files.length} file{diff.files.length === 1 ? "" : "s"}</span>
       </div>
       <ReviewProgress files={diff.files} onReset={resetReview} reviewedFiles={reviewedFiles} />
+      <ReviewToolbar
+        onQueryChange={setFileQuery}
+        query={fileQuery}
+        totalCount={diff.files.length}
+        visibleCount={visibleFiles.length}
+      />
       <div className="review-workspace">
-        <FileNavigator files={diff.files} reviewedFiles={reviewedFiles} />
+        <FileNavigator entries={visibleFiles} reviewedFiles={reviewedFiles} />
         <div className="diff-files">
-        {diff.files.map((file, index) => (
+        {visibleFiles.map(({ file, index }) => (
           <article className="diff-file" id={getFileAnchor(index)} key={file.path}>
             <header
               className="diff-file-header"
@@ -279,6 +291,9 @@ function DiffViewer({ diff, pullRequestNumber }) {
               ))}
           </article>
         ))}
+        {visibleFiles.length === 0 && (
+          <p className="empty-state">No changed files match “{fileQuery}”.</p>
+        )}
         </div>
       </div>
     </section>

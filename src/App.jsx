@@ -29,10 +29,18 @@ function Layout() {
           PRView
         </Link>
         <nav aria-label="Main navigation">
-          <Link className={location.pathname === "/" ? "active" : ""} to="/">
+          <Link
+            aria-current={location.pathname === "/" ? "page" : undefined}
+            className={location.pathname === "/" ? "active" : ""}
+            to="/"
+          >
             Dashboard
           </Link>
-          <Link className={location.pathname === "/pull-requests" ? "active" : ""} to="/pull-requests">
+          <Link
+            aria-current={location.pathname === "/pull-requests" ? "page" : undefined}
+            className={location.pathname === "/pull-requests" ? "active" : ""}
+            to="/pull-requests"
+          >
             Pull requests
           </Link>
         </nav>

@@ -8,7 +8,7 @@
   "forwardPorts": [9999],
   "portsAttributes": {
     "9999": {
-      "label": "Vite development server",
+      "label": "Next.js development server",
       "onAutoForward": "openBrowser"
     }
   },

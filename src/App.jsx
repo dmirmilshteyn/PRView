@@ -134,7 +134,7 @@ function PullRequestDetail() {
   const details = prDetails[`../artifacts/pr/${number}/details.json`];
   const diff = prDiffs[`../artifacts/pr/${number}/diff.json`];
 
-  if (!pullRequest || !details) {
+  if (!pullRequest || !details || !diff) {
     return <Navigate replace to="/pull-requests" />;
   }
 

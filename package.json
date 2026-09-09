@@ -4,18 +4,14 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 9999",
-    "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0 --port 9999"
+    "dev": "next dev --hostname 0.0.0.0 --port 9999",
+    "build": "next build",
+    "start": "next start --hostname 0.0.0.0 --port 9999"
   },
   "dependencies": {
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "react-router-dom": "^7.6.2"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^4.4.1",
-    "shiki": "^4.3.1",
-    "vite": "^6.3.5"
+    "next": "16.2.12",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "shiki": "^4.3.1"
   }
 }

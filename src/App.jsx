@@ -70,6 +70,7 @@ function PullRequestGroups() {
     <div className="pr-groups">
       {categories.map((category) => {
         const items = pullRequests[category.key] ?? [];
+        const newestFirst = [...items].sort((left, right) => right.number - left.number);
 
         return (
           <section className="pr-group" key={category.key}>
@@ -81,8 +82,10 @@ function PullRequestGroups() {
               </div>
             </div>
             <div className="pr-list">
-              {items.length > 0 ? (
-                items.map((pullRequest) => <PullRequestCard key={pullRequest.number} pullRequest={pullRequest} />)
+              {newestFirst.length > 0 ? (
+                newestFirst.map((pullRequest) => (
+                  <PullRequestCard key={pullRequest.number} pullRequest={pullRequest} />
+                ))
               ) : (
                 <p className="empty-state">No pull requests in this group.</p>
               )}

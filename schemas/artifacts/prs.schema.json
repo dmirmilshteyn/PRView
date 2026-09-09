@@ -9,11 +9,23 @@
       "$ref": "#/$defs/pullRequestSummary"
     }
   },
-  "required": ["needsReview", "inProgress", "readyToMerge"],
+  "required": [
+    "yourChanges",
+    "needsYourReview",
+    "returnedToYou",
+    "approved",
+    "waitingForReviewers",
+    "drafts",
+    "waitingForAuthor"
+  ],
   "properties": {
-    "needsReview": { "$ref": "#/$defs/pullRequestList" },
-    "inProgress": { "$ref": "#/$defs/pullRequestList" },
-    "readyToMerge": { "$ref": "#/$defs/pullRequestList" }
+    "yourChanges": { "$ref": "#/$defs/pullRequestList" },
+    "needsYourReview": { "$ref": "#/$defs/pullRequestList" },
+    "returnedToYou": { "$ref": "#/$defs/pullRequestList" },
+    "approved": { "$ref": "#/$defs/pullRequestList" },
+    "waitingForReviewers": { "$ref": "#/$defs/pullRequestList" },
+    "drafts": { "$ref": "#/$defs/pullRequestList" },
+    "waitingForAuthor": { "$ref": "#/$defs/pullRequestList" }
   },
   "$defs": {
     "pullRequestList": {

@@ -2,7 +2,7 @@
 
 ## Project overview
 
-PRView is a Vite-powered React application using Bun and React Router.
+PRView is a Next.js application using Bun and the App Router.
 
 ## Development environment
 

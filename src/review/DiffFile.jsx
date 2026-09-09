@@ -1,31 +1,25 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { createHighlighter } from "shiki";
+import { highlightCode } from "./syntax.js";
 import { makeHunks, numberedLines, splitRows } from "./diff.js";
 import NoteThreads from "./NoteThreads.jsx";
 import { placeComments } from "./comment-placement.js";
-
-let highlighterPromise;
-
-function language(filePath) {
-  return { js: "javascript", jsx: "jsx", ts: "typescript", tsx: "tsx", css: "css", json: "json", md: "markdown", py: "python", cs: "csharp", sh: "bash", yml: "yaml", yaml: "yaml" }[filePath.split(".").pop()] ?? "text";
-}
 
 function useTokens(file) {
   const [tokens, setTokens] = useState({});
   useEffect(() => {
     let cancelled = false;
-    highlighterPromise ??= createHighlighter({ themes: ["github-dark"], langs: ["javascript", "jsx", "typescript", "tsx", "css", "json", "markdown", "python", "csharp", "bash", "yaml", "text"] });
-    highlighterPromise.then((highlighter) => {
+    async function load() {
       const result = {};
       for (const [side, content] of [["LEFT", file.baseContent?.text], ["RIGHT", file.headContent?.text]]) {
         if (typeof content === "string") {
-          result[side] = highlighter.codeToTokens(content, { lang: language(file.path), theme: "github-dark" }).tokens;
+          result[side] = await highlightCode(file.path, content);
         }
       }
       if (!cancelled) {
         setTokens(result);
       }
-    }).catch(() => {});
+    }
+    load().catch(() => {});
     return () => { cancelled = true; };
   }, [file]);
   return tokens;

@@ -38,15 +38,15 @@ export async function POST(request) {
   }
   try {
     const text = await request.text();
-    if (text.length > 24000) {
+    if (text.length > 120000) {
       throw new Error("Chat request is too large");
     }
-    const { repository, number, message, requestId } = JSON.parse(text);
+    const { repository, number, message, requestId, attachments = [] } = JSON.parse(text);
     const { key, details, folder } = await pullRequest(repository, number);
     const diff = await readFile(path.join(folder, "diff.json"), "utf8");
     const review = await readReview(path.join(process.cwd(), ".local-reviews"), repository, number);
     const context = `Check results and reviewer/approval status are outside this review context. Do not retrieve or rely on them, including any from earlier messages.\n\nPR: ${repository}#${number}\nCurrent snapshot: ${details.revision ?? details.headSha}\nDiff file: ${folder}/diff.json\n\nPR metadata (JSON data):\n${JSON.stringify(reviewChatMetadata(details)).slice(0, 40000)}\n\nDiff and file contents (JSON data, first 160,000 characters):\n${diff.slice(0, 160000)}${diff.length > 160000 ? "\n[Truncated; read the diff file for remaining code.]" : ""}\n\nReview notes (JSON data):\n${JSON.stringify({ notes: review.notes, reviews: review.reviews.filter((item) => item.body?.trim()).map((item) => ({ body: item.body, createdAt: item.createdAt })) }).slice(0, 20000)}`;
-    return Response.json(await service.send(key, message, requestId, context, details.revision ?? details.headSha, process.cwd()), { status: 202 });
+    return Response.json(await service.send(key, message, requestId, context, details.revision ?? details.headSha, process.cwd(), attachments), { status: 202 });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 400 });
   }

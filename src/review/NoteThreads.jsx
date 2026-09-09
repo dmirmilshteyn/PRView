@@ -1,3 +1,4 @@
+import { useChatAttachments } from "./ChatAttachmentsContext.jsx";
 import Markdown from "./Markdown.jsx";
 import CommentTime from "./CommentTime.jsx";
 import { useEffect, useRef } from "react";
@@ -7,9 +8,10 @@ export function newDraft() {
 }
 
 export default function NoteThreads({ filePath, revision, notes, draft, onDraft, onUpdate, onCancel, onJump, showComposer, inline }) {
+  const chat = useChatAttachments();
   const inputRef = useRef(null);
   useEffect(() => {
-    if (showComposer && draft.open) {
+    if (showComposer && draft.open && !inputRef.current?.closest("[hidden]")) {
       inputRef.current?.focus({ preventScroll: true });
     }
   }, [showComposer, draft.open, draft.anchor?.start, draft.anchor?.end]);
@@ -38,7 +40,7 @@ export default function NoteThreads({ filePath, revision, notes, draft, onDraft,
       </div>
       <div className="thread-footer">
       <label className="reply-label"><span className="stack-sr-only">Reply</span><textarea rows={2} placeholder="Reply to this thread…" aria-label={`Reply to ${note.body}`} value={draft.replyDrafts[note.id] ?? ""} onChange={(event) => onDraft({ ...draft, replyDrafts: { ...draft.replyDrafts, [note.id]: event.target.value } })} /></label>
-      <div className="thread-actions"><button type="button" onClick={() => onUpdate({ type: "resolve", id: note.id, resolved: !note.resolved })}>{note.resolved ? "Reopen thread" : "Resolve thread"}</button>
+      <div className="thread-actions">{note.anchor && chat && <button type="button" onClick={() => chat.attach(note)}>{chat.attachments.some((item) => item.id === note.id) ? "Attached to chat" : "Send to chat"}</button>}<button type="button" onClick={() => onUpdate({ type: "resolve", id: note.id, resolved: !note.resolved })}>{note.resolved ? "Reopen thread" : "Resolve thread"}</button>
       <button className="thread-reply-submit" type="button" disabled={!draft.replyDrafts[note.id]?.trim()} onClick={() => {
         onUpdate({ type: "reply", id: note.id, reply: { id: crypto.randomUUID(), body: draft.replyDrafts[note.id].trim(), createdAt: new Date().toISOString() } });
         onDraft({ ...draft, replyDrafts: { ...draft.replyDrafts, [note.id]: "" } });
@@ -52,7 +54,11 @@ export default function NoteThreads({ filePath, revision, notes, draft, onDraft,
         <option value="info">Info</option><option value="question">Question</option><option value="warning">Warning</option><option value="blocking">Blocking</option>
       </select></label>
       <textarea ref={inputRef} aria-label={`Comment on ${filePath}`} placeholder="Write a comment (Markdown supported)…" value={draft.body} onChange={(event) => onDraft({ ...draft, body: event.target.value })} />
-      <div className="comment-submit-row"><button type="button" disabled={!draft.body.trim()} onClick={saveNote}>Save comment</button></div>
+      <div className="comment-submit-row">{draft.anchor && chat && <button type="button" disabled={!draft.body.trim()} onClick={() => {
+        if (chat.attach({ id: crypto.randomUUID(), filePath, revision, body: draft.body.trim(), anchor: draft.anchor })) {
+          onCancel();
+        }
+      }}>Send to chat</button>}<button type="button" disabled={!draft.body.trim()} onClick={saveNote}>Save comment</button></div>
     </section>}
   </div>;
 }

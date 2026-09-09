@@ -5,6 +5,33 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { chatKey, createChatStore } from "../lib/chat-store.js";
 import { createChatService, reviewChatMetadata } from "../lib/chat-service.js";
+import { validateChatAttachments } from "../lib/chat-attachments.js";
+
+test("comment attachments preserve code ranges in the prompt and saved session", async () => {
+  const disk = await store();
+  const key = chatKey("owner/repo", 1);
+  const attachments = ["LEFT", "RIGHT"].map((side) => ({ id: randomUUID(), filePath: "src/parser.js", revision: "head", body: `Question about ${side}`, anchor: { side, start: 4, end: 6, excerpt: "const value = parse(input);\nreturn value;", revision: side === "LEFT" ? "base" : "head" } }));
+  const prompts = [];
+  const runner = async ({ prompt, onEvent }) => {
+    prompts.push(prompt);
+    await onEvent({ type: "item.completed", item: { type: "agent_message", text: "Answer" } });
+  };
+  const service = createChatService(disk, runner);
+  const id = randomUUID();
+  await service.send(key, "Compare these blocks", id, "context", "head", "/tmp", attachments);
+  await finish(service, key);
+  await service.send(key, "Compare these blocks", id, "context", "head", "/tmp", attachments);
+  expect(prompts).toHaveLength(1);
+  expect(JSON.parse(prompts[0].split("revision):\n")[1].split("\n\nUser message:")[0])).toEqual(attachments);
+  expect(prompts[0]).toContain("Compare these blocks");
+  expect((await createChatService(disk, runner).get(key)).messages[0].attachments).toEqual(attachments);
+  await service.send(key, "Follow up", randomUUID(), "context", "head", "/tmp", []);
+  expect((await finish(service, key)).messages[2].attachments).toEqual([]);
+  expect(() => validateChatAttachments([{ ...attachments[0], anchor: { ...attachments[0].anchor, end: 1 } }])).toThrow("range");
+  expect(() => validateChatAttachments(Array(21).fill(attachments[0]))).toThrow("20 comments");
+  expect(() => validateChatAttachments([{ ...attachments[0], body: "x".repeat(80001) }])).toThrow("80,000");
+  expect(() => validateChatAttachments([{ ...attachments[0], body: "" }])).toThrow("comment");
+});
 
 test("chat context keeps code discussion without check or reviewer status", () => {
   const metadata = reviewChatMetadata({
@@ -51,10 +78,10 @@ test("chat persists transcript and resumes its exact session after service resta
     await input.onEvent({ type: "item.completed", item: { type: "agent_message", text: "Review response" } });
   };
   const first = createChatService(disk, runner);
-  await first.send(key, "Review this PR", randomUUID(), "PR context", "revision-a", "/tmp");
+  await first.send(key, "Review this PR", randomUUID(), "PR context", "revision-a", "/tmp", []);
   expect((await finish(first, key)).sessionId).toBe(sessionId);
   const second = createChatService(disk, runner);
-  await second.send(key, "What about tests?", randomUUID(), "Updated context", "revision-b", "/tmp");
+  await second.send(key, "What about tests?", randomUUID(), "Updated context", "revision-b", "/tmp", []);
   const saved = await finish(second, key);
   expect(calls).toEqual([null, sessionId]);
   expect(saved.messages.map((item) => item.role)).toEqual(["user", "assistant", "user", "assistant"]);
@@ -72,9 +99,9 @@ test("duplicate submissions are idempotent and concurrent turns are rejected", a
   });
   const key = chatKey("owner/repo", 1);
   const id = randomUUID();
-  await service.send(key, "First", id, "context", "a", "/tmp");
-  expect((await service.send(key, "First", id, "context", "a", "/tmp")).messages).toHaveLength(1);
-  await expect(service.send(key, "Second", randomUUID(), "context", "a", "/tmp")).rejects.toThrow("already responding");
+  await service.send(key, "First", id, "context", "a", "/tmp", []);
+  expect((await service.send(key, "First", id, "context", "a", "/tmp", [])).messages).toHaveLength(1);
+  await expect(service.send(key, "Second", randomUUID(), "context", "a", "/tmp", [])).rejects.toThrow("already responding");
   release();
   expect((await finish(service, key)).messages).toHaveLength(2);
 });
@@ -87,12 +114,12 @@ test("failed and interrupted turns preserve the session and surface errors", asy
     await onEvent({ type: "thread.started", thread_id: sessionId });
     throw new Error("Authentication expired");
   });
-  await service.send(key, "Review", randomUUID(), "context", "a", "/tmp");
+  await service.send(key, "Review", randomUUID(), "context", "a", "/tmp", []);
   const saved = await finish(service, key);
   expect(saved.error).toBe("Authentication expired");
   expect(saved.sessionId).toBe(sessionId);
   await disk.update(key, (state) => ({ ...state, status: "running" }));
   expect((await createChatService(disk, async () => {}).get(key)).error).toContain("interrupted");
   expect(() => chatKey("../repo", 1)).toThrow();
-  await expect(service.send(key, " ", randomUUID(), "context", "a", "/tmp")).rejects.toThrow("message");
+  await expect(service.send(key, " ", randomUUID(), "context", "a", "/tmp", [])).rejects.toThrow("message");
 });

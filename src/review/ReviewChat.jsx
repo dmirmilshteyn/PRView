@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import Markdown from "./Markdown.jsx";
 import CommentTime from "./CommentTime.jsx";
+import { ChatAttachmentsContext } from "./ChatAttachmentsContext.jsx";
+import ChatAttachments from "./ChatAttachments.jsx";
+import { validateChatAttachments } from "../../lib/chat-attachments.js";
 
 export default function ReviewChat({ repository, number, children }) {
   const [open, setOpen] = useState(true);
   const [chat, setChat] = useState(null);
   const [draft, setDraft] = useState("");
+  const [attachments, setAttachments] = useState([]);
+  const attachmentsRef = useRef([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const [retry, setRetry] = useState(0);
@@ -60,14 +65,33 @@ export default function ReviewChat({ repository, number, children }) {
     }
   }, [open, chat?.messages, chat?.activity]);
 
+  function updateAttachments(value) {
+    attachmentsRef.current = value;
+    setAttachments(value);
+  }
+
+  function attach(note) {
+    setOpen(true);
+    try {
+      const attachment = { id: note.id, filePath: note.filePath, revision: note.revision, body: [note.body, ...(note.replies ?? []).map((reply) => `Reply: ${reply.body}`)].join("\n\n"), anchor: { ...note.anchor, revision: note.anchor?.revision ?? note.revision } };
+      updateAttachments(validateChatAttachments([...attachmentsRef.current.filter((item) => item.id !== note.id), attachment]));
+      setError(null);
+      return true;
+    } catch (failure) {
+      setError(failure.message);
+      return false;
+    }
+  }
+
   async function send(event) {
     event.preventDefault();
     if (!draft.trim() || sendingRef.current || chat?.status === "running") {
       return;
     }
     const message = draft.trim();
-    if (pendingRequest.current?.message !== message) {
-      pendingRequest.current = { message, requestId: crypto.randomUUID() };
+    const batch = attachmentsRef.current;
+    if (pendingRequest.current?.message !== message || JSON.stringify(pendingRequest.current?.attachments) !== JSON.stringify(batch)) {
+      pendingRequest.current = { message, attachments: batch, requestId: crypto.randomUUID() };
     }
     sendingRef.current = true;
     generation.current += 1;
@@ -83,6 +107,7 @@ export default function ReviewChat({ repository, number, children }) {
       if (active.current) {
         setChat(value);
         setDraft("");
+        updateAttachments(attachmentsRef.current.filter((item) => !batch.some((sent) => JSON.stringify(sent) === JSON.stringify(item))));
         pendingRequest.current = null;
       }
     } catch (failure) {
@@ -97,7 +122,7 @@ export default function ReviewChat({ repository, number, children }) {
     }
   }
 
-  return <div className={`pr-chat-layout ${open ? "chat-open" : ""}`}>
+  return <ChatAttachmentsContext.Provider value={{ attach, attachments }}><div className={`pr-chat-layout ${open ? "chat-open" : ""}`}>
     <div className="pr-chat-main">{children}</div>
     {!open && <div className="chat-rail"><button className="chat-launcher" type="button" title="Open review chat" aria-label="Open review chat" onClick={() => setOpen(true)} aria-expanded={false} aria-controls="review-chat">
       <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20 15a3 3 0 0 1-3 3H9l-5 3V6a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v9Z" /><path d="M8 8h8M8 12h5" /></svg>
@@ -108,17 +133,18 @@ export default function ReviewChat({ repository, number, children }) {
       <div className="chat-messages" ref={messagesRef} onScroll={(event) => { const element = event.currentTarget; follow.current = element.scrollHeight - element.scrollTop - element.clientHeight < 70; }}>
         {!chat && !error && <p className="review-muted">Loading conversation…</p>}
         {chat?.messages.length === 0 && <div className="chat-empty"><strong>A second look at this PR</strong><p>Ask about bugs, tradeoffs, missing tests, or anything in the diff.</p></div>}
-        {chat?.messages.map((message) => <div className={`chat-message ${message.role}`} key={message.id}><div className="thread-message-meta"><strong>{message.role === "user" ? "You" : "Luna"}</strong><CommentTime value={message.createdAt} /></div><Markdown>{message.text}</Markdown></div>)}
+        {chat?.messages.map((message) => <div className={`chat-message ${message.role}`} key={message.id}><div className="thread-message-meta"><strong>{message.role === "user" ? "You" : "Luna"}</strong><CommentTime value={message.createdAt} /></div><ChatAttachments attachments={message.attachments} onRemove={null} /><Markdown>{message.text}</Markdown></div>)}
         {chat?.status === "running" && <p className="chat-activity" role="status">{chat.activity || "Luna is responding…"}</p>}
         {chat?.error && <p className="chat-error" role="alert">{chat.error}</p>}
       </div>
       {error && <p className="chat-error" role="alert">{error} <button type="button" onClick={() => setRetry((value) => value + 1)}>Retry connection</button></p>}
-      <form className="chat-compose" onSubmit={send}><label className="stack-sr-only" htmlFor="review-chat-message">Message Luna</label><textarea id="review-chat-message" placeholder="Ask Luna about this PR…" value={draft} maxLength={10000} disabled={sending} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => {
+      <form className="chat-compose" onSubmit={send}>
+        <ChatAttachments attachments={attachments} onRemove={sending ? null : (id) => updateAttachments(attachmentsRef.current.filter((item) => item.id !== id))} /><label className="stack-sr-only" htmlFor="review-chat-message">Message Luna</label><textarea id="review-chat-message" placeholder="Ask Luna about this PR…" value={draft} maxLength={10000} disabled={sending} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => {
         if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
           event.preventDefault();
           event.currentTarget.form.requestSubmit();
         }
       }} /><div><span title={chat?.sessionId || "A session starts with your first message"}>{chat?.sessionId ? `Session ${chat.sessionId.slice(0, 8)}` : "Luna · PR context included"}</span><button type="submit" disabled={!chat || sending || chat.status === "running" || !draft.trim()}>{sending ? "Sending…" : "Send"}</button></div></form>
     </aside>
-  </div>;
+  </div></ChatAttachmentsContext.Provider>;
 }

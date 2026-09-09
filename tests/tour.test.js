@@ -16,7 +16,7 @@ function input() {
   ] });
 }
 function tour() {
-  return { title: "Follow the empty-input path", overview: "Empty input now returns an array.", flow: "Input passes through src/parser.js.", steps: [{ title: "Guard behavior", risk: "medium", why: "Changes the return contract", explanation: "The fallback returns an empty array.", references: [{ path: "src/parser.js", side: "RIGHT", start: 1, end: 3 }], questions: ["Should false also become an array?"] }], existingTests: [], suggestedTests: ["Pass false and check the expected contract"], notCovered: [], limitations: ["Tests were not supplied"] };
+  return { title: "Follow the empty-input path", overview: "Empty input now returns an array.", flow: "Input passes through src/parser.js.", steps: [{ title: "Guard behavior", risk: "medium", why: "Changes the return contract", explanation: "The fallback returns an empty array.", references: [{ path: "src/parser.js", side: "RIGHT", start: 1, end: 3 }], questions: ["Should false also become an array?"] }], mechanical: [], existingTests: [], suggestedTests: ["Pass false and check the expected contract"], notCovered: [], limitations: ["Tests were not supplied"] };
 }
 async function setup(runner) {
   const root = await mkdtemp(path.join(os.tmpdir(), "prview-tour-"));
@@ -99,4 +99,42 @@ test("invalid output and interrupted generation can be explicitly retried", asyn
   expect((await finish(service, key)).status).toBe("ready");
   await store.update(key, (state) => ({ ...state, status: "running" }));
   expect((await service.get(key)).error).toContain("interrupted");
+});
+
+
+test("mechanical work is validated separately, including mechanical-only tours", () => {
+  const value = tour();
+  value.mechanical = [{ ...value.steps[0], title: "Forward the parser prop", risk: "low" }];
+  let result = validateTour(JSON.stringify(value), input());
+  expect(result.steps).toHaveLength(1);
+  expect(result.mechanical).toHaveLength(1);
+  expect(result.mechanical[0].references[0].excerpt).toContain("return input");
+  value.steps = [];
+  result = validateTour(JSON.stringify(value), input());
+  expect(result.steps).toHaveLength(0);
+  expect(result.mechanical).toHaveLength(1);
+  value.mechanical[0].references[0].path = "missing.js";
+  expect(() => validateTour(JSON.stringify(value), input())).toThrow("invalid code reference");
+  expect(tourFingerprint({ ...input(), version: 1 })).not.toBe(tourFingerprint(input()));
+});
+
+test("tour review progress persists, merges concurrent sections, and stays snapshot scoped", async () => {
+  const runner = async ({ onEvent }) => { await onEvent({ type: "item.completed", item: { type: "agent_message", text: JSON.stringify(tour()) } }); };
+  const { service, store, root, key, source } = await setup(runner);
+  await service.generate(key, source, false);
+  const original = await finish(service, key);
+  await Promise.all([service.markReviewed(key, "overview", true), service.markReviewed(key, "step-1", true)]);
+  const restarted = createTourService(store, runner, root);
+  const saved = await restarted.get(key);
+  expect(Object.keys(saved.reviewedSections).sort()).toEqual(["overview", "step-1"]);
+  expect(saved.generatedAt).toBe(original.generatedAt);
+  expect(saved.tour).toEqual(original.tour);
+  await restarted.markReviewed(key, "overview", false);
+  expect(Object.keys((await store.read(key)).reviewedSections)).toEqual(["step-1"]);
+  const otherKey = key.replace(/[^/]+$/, "d".repeat(64));
+  expect((await restarted.get(otherKey)).reviewedSections).toBeUndefined();
+  await expect(restarted.markReviewed(key, "step-999", true)).rejects.toThrow("Unknown");
+  await expect(restarted.markReviewed(key, "mechanical", true)).rejects.toThrow("Unknown");
+  await expect(restarted.markReviewed(key, "overview", "yes")).rejects.toThrow("required");
+  await expect(restarted.markReviewed(otherKey, "overview", true)).rejects.toThrow("Generate");
 });

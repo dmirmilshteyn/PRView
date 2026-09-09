@@ -36,6 +36,8 @@ async function loadReviewData(number) {
     if (!details) {
       return null;
     }
+    pr.additions = details.additions;
+    pr.deletions = details.deletions;
     const review = await readReview(path.join(process.cwd(), ".local-reviews"), details.repository, details.number);
     return { number: details.number, repository: details.repository, approved: hasPullRequestApproval(details), ci: pullRequestCI(details), pinned: review.pinned === true };
   }))).filter(Boolean);

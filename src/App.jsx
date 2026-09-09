@@ -1,6 +1,7 @@
 "use client";
 
 import CodeTour from "./review/CodeTour.jsx";
+import ChangeStats from "./review/ChangeStats.jsx";
 import ReviewProvider from "./review/ReviewProvider.jsx";
 import PinProvider, { usePins } from "./review/PinProvider.jsx";
 import PinButton from "./review/PinButton.jsx";
@@ -76,6 +77,7 @@ function PullRequestCard({ pullRequest }) {
       </div>
       <h3>{pullRequest.title}</h3>
       {pullRequest.shortSummary && <p>{pullRequest.shortSummary}</p>}
+      <ChangeStats additions={pullRequest.additions} deletions={pullRequest.deletions} />
     </Link>
     <PinButton number={pullRequest.number} />
     </div>
@@ -180,12 +182,14 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
           ←
         </Link>
         <p className="eyebrow">Pull request #{pullRequest.number}</p>
-        <PinButton number={pullRequest.number} />
-        <RefreshButton repository={details.repository} number={details.number} />
+        <div className="detail-actions">
+          <PinButton number={pullRequest.number} />
+          <RefreshButton repository={details.repository} number={details.number} />
+        </div>
       </div>
       <h1>{details.title}</h1>
       <StackNavigator stack={getPullRequestStack(details, stackPRs)} repository={details.repository} currentNumber={number} />
-        <section className="pr-page-section" id="info" aria-labelledby="info-heading">
+        <section className="pr-page-section pr-info-card" id="info" aria-labelledby="info-heading">
           <h2 className="pr-section-heading" id="info-heading">Info</h2>
           <PullRequestContext details={details} />
           <div className="detail-grid">
@@ -245,7 +249,7 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
             </div>
             <div>
               <dt>Changes</dt>
-              <dd>+{details.additions} / −{details.deletions}</dd>
+              <dd><ChangeStats additions={details.additions} deletions={details.deletions} /></dd>
             </div>
             <div>
               <dt>Files changed</dt>

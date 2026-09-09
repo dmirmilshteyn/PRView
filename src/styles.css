@@ -30,6 +30,14 @@
 .chat-message .review-markdown > :last-child { margin-bottom: 0; }
 .chat-message .review-markdown h1, .chat-message .review-markdown h2 { font-size: 1rem; }
 .chat-compose { border-top: 1px solid #344156; padding: 0.85rem; background: #141e2c; }
+.chat-attachments { display: grid; gap: 0.45rem; max-height: 240px; overflow-y: auto; margin-bottom: 0.65rem; }
+.chat-attachment { display: flex; align-items: flex-start; gap: 0.4rem; padding: 0.6rem; background: #101a28; border: 1px solid #354960; border-radius: 6px; font-size: 0.75rem; }
+.chat-attachment details { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.chat-attachment summary { cursor: pointer; color: #a5d7cb; }
+.chat-attachment small { display: block; color: #94a5bf; margin-top: 0.5rem; }
+.chat-attachment pre { overflow: auto; max-height: 160px; white-space: pre; font-size: 0.7rem; }
+.chat-attachment p { white-space: pre-wrap; margin-bottom: 0; }
+.chat-attachment > button { flex-shrink: 0; padding: 0 0.3rem; }
 .chat-compose textarea { width: 100%; min-height: 85px; max-height: 230px; resize: vertical; background: #0d141f; border: 1px solid #40516a; border-radius: 6px; padding: 0.7rem; color: #e1e9f5; font: inherit; font-size: 0.85rem; }
 .chat-compose > div { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; margin-top: 0.6rem; }
 .chat-compose span { color: #94a5bf; font-size: 0.68rem; }
@@ -43,7 +51,7 @@
   .review-chat { width: min(380px, calc(100vw - 42px)); }
 }
 
-.review-workspace button, .review-workspace select, .pr-context button {
+.review-workspace button, .review-workspace select, .pr-context button, .tour-inline-comments button, .tour-inline-comments select {
   background: #182330;
   color: #dce8f2;
   border: 1px solid #344456;
@@ -401,6 +409,14 @@ h1 {
   gap: 0.9rem;
 }
 
+.change-stats { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0.55rem; font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+.change-added { color: #7edba2; }
+.change-deleted { color: #f18e99; }
+.change-bar { display: inline-flex; width: 84px; height: 7px; border-radius: 3px; overflow: hidden; background: #344456; }
+.change-bar-added { background: #57bf80; }
+.change-bar-deleted { background: #e57180; }
+.pr-card > .change-stats { margin-top: 0.75rem; }
+
 .pr-card {
   background: rgba(19, 29, 39, 0.82);
   border: 1px solid #253542;
@@ -493,6 +509,18 @@ h1 {
   line-height: 1;
 }
 
+.detail-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.detail-actions .pr-refresh { justify-content: flex-end; }
+.detail-actions .pr-refresh-status:empty { display: none; }
+
 .detail-kicker + h1 {
   margin-top: 0;
 }
@@ -511,6 +539,17 @@ h1 {
 }
 
 .pr-page-section { margin-top: 2.5rem; scroll-margin-top: 1rem; }
+.pr-info-card {
+  background: #101821;
+  border: 1px solid #2a3a49;
+  border-radius: 10px;
+  padding: clamp(1rem, 2vw, 1.75rem);
+  box-shadow: 0 4px 18px #0002;
+  min-width: 0;
+}
+.pr-info-card > .pr-context { background: none; border: 0; border-radius: 0; padding: 0; margin-bottom: 1.25rem; }
+.pr-info-card > .detail-grid { border-top: 1px solid #22303d; }
+.pr-info-card > .metadata-list { margin-top: 0; }
 .pr-section-heading { font-size: 1.1rem; font-weight: 600; color: #c3d2df; border-bottom: 1px solid #2a3a49; padding-bottom: 0.8rem; margin: 0 0 1.25rem; }
 .code-tour-tabs { display: flex; gap: 1.5rem; border-bottom: 1px solid #2a3a49; margin-bottom: 1.25rem; }
 .code-tour-tabs button { border: 0; border-bottom: 2px solid transparent; background: transparent; color: #9aabba; font: inherit; font-size: 1.1rem; font-weight: 600; padding: 0 0 0.8rem; cursor: pointer; }
@@ -525,6 +564,7 @@ h1 {
 @media (prefers-reduced-motion: reduce) { .tour-spinner { animation: none; } }
 .tour-meta { display: flex; flex-wrap: wrap; gap: 0.5rem 1.2rem; color: #94a9bc; font-size: 0.75rem; margin: 0 0 1rem; }
 .tour-sidebar > strong { display: block; padding: 0.5rem; font-size: 0.8rem; color: #b9c9d6; }
+.tour-sidebar { position: sticky; top: 1rem; }
 .tour-sidebar button { margin: 0.2rem 0; border-radius: 4px; line-height: 1.4; align-items: baseline; }
 .tour-stop-number { flex: 0 0 1.4rem; font-size: 0.75rem; opacity: 0.8; }
 .tour-risk { display: block; font-size: 0.65rem; margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.04em; }
@@ -535,18 +575,41 @@ h1 {
 .tour-content h4 { font-size: 0.9rem; margin: 1.1rem 0 0.6rem; color: #d3e0ed; }
 .tour-content li { line-height: 1.6; padding-left: 0.2rem; }
 .tour-section-heading { scroll-margin-top: 1rem; }
+.tour-section > summary { position: relative; padding-left: 1.6rem; cursor: pointer; list-style: none; }
+.tour-section > summary::-webkit-details-marker { display: none; }
+.tour-section > summary::before { content: "▸"; position: absolute; left: 0; top: 0.2rem; color: #86dec0; }
+.tour-section[open] > summary::before { content: "▾"; }
+.tour-section > summary:focus-visible { outline: 2px solid #86dec0; outline-offset: 5px; border-radius: 3px; }
+.tour-reviewed { display: inline-flex; align-items: center; gap: 0.4rem; color: #b5c9bd; font-size: 0.75rem; cursor: pointer; margin: 0.1rem 0 0.6rem; }
+.tour-reviewed input { accent-color: #86dec0; width: 1rem; height: 1rem; margin: 0; }
+.tour-reviewed input:focus-visible { outline: 2px solid #86dec0; outline-offset: 3px; }
+.tour-stop-number.is-reviewed { color: #86dec0; opacity: 1; }
+.tour-review-progress { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; font-size: 0.8rem; color: #b5c9bd; }
+.tour-review-progress > span { color: #94a9bc; font-size: 0.75rem; }
+.tour-save-error { color: #f2af9c; font-size: 0.85rem; }
+.tour-section:not([open]) > summary h3 { margin-bottom: 0; }
+.tour-mechanical > summary h3 { color: #afbfcc; }
+.tour-mechanical-group + .tour-mechanical-group { border-top: 1px solid #2d4152; margin-top: 1.5rem; padding-top: 1rem; }
+.tour-section { scroll-margin-top: 1rem; }
+.tour-section + .tour-section { margin-top: 2.5rem; padding-top: 2rem; border-top: 1px solid #2d4152; }
+@media (max-width: 900px) {
+  .tour-sidebar { top: 0; z-index: 10; max-height: 180px; }
+  .tour-section { scroll-margin-top: 204px; }
+}
 .tour-section-heading h3 { font-size: 1.5rem; letter-spacing: -0.03em; margin: 0.5rem 0 1.1rem; }
 .tour-callout { border-left: 3px solid #779bbc; background: #152331; padding: 0.1rem 1rem 0.4rem; margin: 1.2rem 0; border-radius: 0 5px 5px 0; }
 .tour-callout.high { border-left-color: #dc9e85; }
 .tour-callout.medium { border-left-color: #d5bd81; }
 .tour-code { border: 1px solid #2d4152; border-radius: 6px; overflow: hidden; margin: 1.25rem 0; }
 .tour-code header { display: flex; gap: 0.6rem; align-items: center; justify-content: space-between; flex-wrap: wrap; background: #182634; padding: 0.6rem 0.8rem; font-size: 0.75rem; }
-.tour-code pre { background: #0b141d; margin: 0; padding: 0.7rem 0; overflow: auto; font-size: 0.75rem; line-height: 1.65; }
-.tour-code-line { display: block; min-width: max-content; padding-right: 1rem; }
-.tour-code-line > span { display: inline-block; width: 4.5rem; padding-right: 1.2rem; text-align: right; color: #6c879d; user-select: none; }
+.tour-code-body { background: #0b141d; padding: 0.7rem 0; overflow: auto; font-size: 0.75rem; line-height: 1.65; }
+.tour-code-line { display: flex; min-width: max-content; padding-right: 1rem; }
+.tour-code-line > code { white-space: pre; }
+.tour-code-line > .tour-line-number { display: inline-block; flex-shrink: 0; width: 4.5rem; padding: 0 1.2rem 0 0; text-align: right; color: #6c879d; user-select: none; background: transparent; border: 0; border-radius: 0; font: inherit; cursor: pointer; }
+.tour-line-number:hover, .tour-code-line > .tour-line-number.selected-line { color: #a5d7cb; background: #234439; }
+.tour-line-number:focus-visible { outline: 2px solid #76d3b2; outline-offset: -2px; }
+.tour-inline-comments { padding: 0.75rem 1rem; min-width: 0; white-space: normal; }
 .tour-questions { padding: 0.1rem 1rem 0.5rem; background: #142923; border: 1px solid #2a453b; border-radius: 6px; }
-.tour-pagination { display: flex; justify-content: space-between; align-items: center; gap: 0.7rem; border-top: 1px solid #2d4152; padding-top: 1rem; margin-top: 1.5rem; }
-.tour-pagination span { font-size: 0.75rem; color: #94a9bc; }
 
 .detail-grid {
   border-bottom: 1px solid #22303d;

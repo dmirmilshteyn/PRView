@@ -21,6 +21,25 @@ export async function GET(request) {
   }
 }
 
+export async function PATCH(request) {
+  try {
+    const origin = request.headers.get("origin");
+    if (origin && origin !== new URL(request.url).origin && new URL(origin).host !== request.headers.get("host")) {
+      return Response.json({ error: "Cross-origin writes are not allowed" }, { status: 403 });
+    }
+    const text = await request.text();
+    if (text.length > 2000) {
+      throw new Error("Tour update is too large");
+    }
+    const { repository, number, fingerprint, section, reviewed } = JSON.parse(text);
+    const key = `${chatKey(repository, number)}/${fingerprint}`;
+    const state = await service.markReviewed(key, section, reviewed);
+    return Response.json({ reviewedSections: state.reviewedSections }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 400 });
+  }
+}
+
 export async function POST(request) {
   try {
     const origin = request.headers.get("origin");

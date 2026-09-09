@@ -30,34 +30,254 @@
     "checks"
   ],
   "properties": {
-    "number": { "type": "integer", "minimum": 1 },
-    "link": { "type": "string", "format": "uri" },
-    "title": { "type": "string", "minLength": 1 },
-    "description": { "type": "string" },
-    "repository": { "type": "string", "minLength": 1 },
-    "author": { "type": "string", "minLength": 1 },
-    "branch": { "type": "string", "minLength": 1 },
-    "baseBranch": { "type": "string", "minLength": 1 },
-    "status": { "type": "string", "enum": ["needs-review", "in-progress", "ready-to-merge"] },
-    "createdAt": { "type": "string", "format": "date" },
-    "updatedAt": { "type": "string", "format": "date" },
-    "reviewers": { "$ref": "#/$defs/stringList" },
-    "assignees": { "$ref": "#/$defs/stringList" },
-    "labels": { "$ref": "#/$defs/stringList" },
-    "milestone": { "type": "string", "minLength": 1 },
-    "draft": { "type": "boolean" },
-    "mergeable": { "type": "boolean" },
-    "reviewDecision": { "type": "string", "enum": ["Awaiting review", "Changes requested", "In review", "Approved"] },
-    "filesChanged": { "type": "integer", "minimum": 0 },
-    "additions": { "type": "integer", "minimum": 0 },
-    "deletions": { "type": "integer", "minimum": 0 },
-    "commits": { "type": "integer", "minimum": 0 },
-    "checks": { "type": "string", "minLength": 1 }
+    "number": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "link": {
+      "type": "string",
+      "format": "uri"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "shortSummary": {
+      "type": "string",
+      "default": "",
+      "description": "Short preview for dashboard and PR list cards; empty until populated."
+    },
+    "repository": {
+      "type": "string",
+      "minLength": 1
+    },
+    "author": {
+      "type": "string",
+      "minLength": 1
+    },
+    "branch": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baseBranch": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "needs-review",
+        "in-progress",
+        "ready-to-merge"
+      ]
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date"
+    },
+    "reviewers": {
+      "$ref": "#/$defs/stringList"
+    },
+    "assignees": {
+      "$ref": "#/$defs/stringList"
+    },
+    "labels": {
+      "$ref": "#/$defs/stringList"
+    },
+    "milestone": {
+      "type": "string",
+      "minLength": 1
+    },
+    "draft": {
+      "type": "boolean"
+    },
+    "mergeable": {
+      "type": "boolean"
+    },
+    "reviewDecision": {
+      "type": "string",
+      "enum": [
+        "Awaiting review",
+        "Changes requested",
+        "In review",
+        "Approved"
+      ]
+    },
+    "filesChanged": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "additions": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "deletions": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "commits": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "checks": {
+      "type": "string",
+      "minLength": 1
+    },
+    "body": {
+      "type": "string"
+    },
+    "revision": {
+      "type": "string"
+    },
+    "syncedAt": {
+      "type": "string"
+    },
+    "headSha": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "baseSha": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "diffBaseSha": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "checkRuns": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "reviewRequests": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "reviewHistory": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "github": {
+      "type": "object",
+      "required": [
+        "comments",
+        "reviews",
+        "inlineComments",
+        "threads"
+      ],
+      "properties": {
+        "comments": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "reviews": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "inlineComments": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "threads": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "stack": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "number",
+        "baseBranch",
+        "entries"
+      ],
+      "properties": {
+        "number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "baseBranch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entries": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "number",
+              "title",
+              "branch",
+              "state",
+              "draft"
+            ],
+            "properties": {
+              "number": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "title": {
+                "type": "string"
+              },
+              "branch": {
+                "type": "string"
+              },
+              "state": {
+                "enum": [
+                  "OPEN",
+                  "CLOSED",
+                  "MERGED",
+                  "QUEUED"
+                ]
+              },
+              "draft": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    }
   },
   "$defs": {
     "stringList": {
       "type": "array",
-      "items": { "type": "string", "minLength": 1 }
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     }
   }
 }

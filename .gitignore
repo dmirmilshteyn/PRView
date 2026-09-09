@@ -3,4 +3,8 @@ dist
 .next
 .DS_Store
 /artifacts/
+/.local-reviews/
+/.pr-chats/
+/.devcontainer/gh-auth/
+__pycache__/
 prs.json

@@ -1,10 +1,12 @@
 # PRView
 
-PRView is a Next.js application powered by React and Bun.
+PRView is a local PR review workspace built with Next.js, React and Bun. GitHub is read-only: importing a PR never posts comments, submits reviews, resolves threads, or changes the PR.
 
 ## Development
 
 Open this repository in the included devcontainer. Dependencies are installed automatically and the development server runs on port `9999`.
+
+The image includes Bun, Python, uv and the GitHub CLI. To rebuild and restart the same development image with Docker Compose, first run `sh .devcontainer/prepare-gh-auth.sh` on the host, then `docker compose up -d --build` from the checkout. Run project commands inside the container (`docker compose exec prview …`) or a devcontainer terminal.
 
 ```sh
 bun run dev
@@ -14,11 +16,69 @@ The app uses the Next.js App Router with `/`, `/pull-requests`, and `/pull-reque
 
 ## Syncing pull requests
 
-The devcontainer includes Python, uv, and the GitHub CLI. Authenticate `gh`, then sync the open pull requests for a repository into PRView's local artifact format:
+The devcontainer reuses the host's GitHub login. Authenticate `gh` on the host first. The devcontainer initialization exports the Keychain-backed token to `.devcontainer/gh-auth/hosts.yml` (owner-only permissions), excluded from Git and Docker build context, and mounts the directory read-only at `/run/gh-auth`. For Docker Compose, run the preparation script above explicitly. Rerun it after rotating the host token; the mounted directory makes the updated file available without rebuilding.
+
+Run the CLI from the repository root inside the devcontainer:
 
 ```sh
-gh auth login
-uv run ./pr sync OWNER/REPO
+# Show available commands and sync options
+uv run ./pr --help
+uv run ./pr sync --help
+
+# Sync one PR (automatically includes its entire native GitHub stack)
+uv run ./pr sync dmirmilshteyn/PRView 23
+
+# Repository URLs are also accepted
+uv run ./pr sync https://github.com/dmirmilshteyn/PRView 23
+
+# Sync all open PRs and their native stacks
+uv run ./pr sync dmirmilshteyn/PRView --all
+
+# Limit the initial selection to 10 open PRs, including all their stack members
+uv run ./pr sync dmirmilshteyn/PRView --all --limit 10
+
+# Write to a separate directory
+uv run ./pr sync dmirmilshteyn/PRView 23 --output /tmp/prview-artifacts
 ```
 
-By default, the command writes `artifacts/prs.json` plus `details.json` and `diff.json` under `artifacts/pr/<number>/`. Use `--output` to choose another directory and `--limit` to change the default limit of 100 open pull requests.
+To invoke the CLI from the host through the running Compose container:
+
+```sh
+docker compose exec prview uv run ./pr sync dmirmilshteyn/PRView 23
+docker compose exec prview uv run ./pr sync dmirmilshteyn/PRView --all
+```
+
+Supply either a positive PR number or `--all`, never both. `--limit` accepts a positive number and requires `--all`; there is no default limit. Stack membership comes only from native GitHub metadata, and every member is included, even closed or merged PRs. PRs without that metadata sync individually.
+
+By default, the command writes `artifacts/prs.json` plus `details.json` and `diff.json` under `artifacts/pr/<number>/`. A targeted sync preserves other imported PRs from the same repository. `--all` refreshes the dashboard list. `--output` changes the destination for that invocation; it does not change the app's artifact directory.
+
+Sync includes the complete Markdown description, review requests and decisions, checks with detail links, issue discussion, and inline GitHub threads with replies and resolution state. It also fetches changed files at the diff's merge base and head commit for expanded context and full-file viewing. Binary, oversized and unavailable files retain an explicit context-unavailable message. A PR changing during import causes sync to fail so it can be retried consistently.
+
+## Local review
+
+- Click **Refresh** beside Pin in the PR header to sync the latest GitHub comments, discussions, review decisions, and CI results. It runs the targeted CLI sync, including native stack members and updated code, then updates the page. Saved review notes and chat sessions are preserved.
+- PRs use one page with Info above Code. Native GitHub stacks appear below the PR title and above Info, with the topmost PR first and the trunk at the bottom. Click a member to switch PRs. Approval and CI each have a check: green for at least one synced approval or successful CI, grey otherwise. Hover for the status; absent checks never count as passing. Branch relationships alone never create a stack. Unsynced or merged members without local artifacts link to GitHub instead.
+- Pin a PR from its card or detail page to move it into the Pinned section on the dashboard and pull request list. Pins persist alongside review data; unpinning returns a PR to its regular group.
+- Use Review chat on the right edge to talk to Luna about the PR. The sidebar starts expanded and can be collapsed to its icon button. Messages and the Codex session ID are saved per repository/PR under `.pr-chats/`; follow-ups resume that exact session, including after reloads. Codex session files persist in the `prview-codex-data` Docker volume, with host authentication mounted read-only. Chat runs `gpt-5.6-luna` in a read-only sandbox and receives the PR metadata, diff, and review notes. The current CLI uses its legacy Landlock sandbox because Docker blocks bubblewrap user namespaces; this deprecated option will need revisiting on a future CLI upgrade. Only one response runs per PR at a time. Interrupted turns retain the session and show an error so another message can continue it.
+- Hover a line number to reveal **+**, or click the old/new line number, to open a comment box directly below that line. Drag across line numbers, or click the first and Shift-click the last on the same side, to select a range in either direction. The selected code is highlighted and the composer appears below the range. Saved comments and replies stay inline in unified, split and full-file views, with local drafts, Markdown, severity, resolution and reopening. Comments on hidden lines or older revisions remain accessible below the diff. File comments are also available.
+- Drafts (including reply drafts), reviewed flags, diff preferences, expanded/full-file settings and reading position save automatically. The status indicator confirms when they are on disk; a failed save can be retried. Wait for “Saved locally” before closing the page.
+- Finish a review below the changed files with Comment, Request changes, or Approve. The summary and action save as a local entry in the main PR discussion, with local provenance, timestamp, and snapshot metadata. Review drafts persist per snapshot. These actions never submit a GitHub review or change its approval status.
+- “Next unreviewed file” (keyboard shortcut **N**, outside text inputs) navigates the visible file list. Filename search, unified/split view, ignore leading/trailing whitespace, expandable context and full old/new files are available.
+- Marking the first file reviewed sets a review baseline. “Changes since last review” compares that snapshot with the selected snapshot. You can choose or advance the baseline explicitly. Changed files lose their checked state and show a re-review indicator; unchanged files remain checked.
+- Notes keep their original snapshot, side, line range and code excerpt. Earlier snapshots can be opened from the snapshot selector or an anchored note. Notes on files no longer in the diff remain accessible below the file list. Older drafts remain available when selecting their snapshot.
+
+Imported snapshots live in `artifacts/history/OWNER/REPO/NUMBER/COMMIT.json`. Personal review data lives separately in `.local-reviews/<repository-hash>/<number>.json`; both directories are ignored by Git. Sync never writes `.local-reviews`. Back up that directory to retain your work. Local updates use serialized, atomic file replacement within the single running app server. There is no user authentication or shared multi-server storage.
+
+The active dashboard displays one imported repository at a time. Local review state and historical snapshots are isolated by repository and PR number. Existing artifacts without commit/content data still display their imported patches; sync again for full context, and capture at least two revisions to compare changes over time. Legacy file comments in `artifacts/comments.json` are preserved and displayed separately because they did not record a repository or commit.
+
+## Verification
+
+Run inside the devcontainer:
+
+```sh
+bun run test
+python3 -m unittest discover -s tests -v
+bun run build
+```
+
+For a deterministic browser fixture without GitHub access, run `python3 -m tests.create_demo artifacts`, then open `/pull-requests/900001`. This adds a clearly labeled local demo PR and two commit snapshots while preserving existing PRs. It contains a full description, discussions, detailed checks, whitespace-only changes and a changed file between revisions.

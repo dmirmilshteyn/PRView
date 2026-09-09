@@ -4,35 +4,133 @@
   "title": "PRView Pull Request Diff",
   "type": "object",
   "additionalProperties": false,
-  "required": ["files"],
+  "required": [
+    "files"
+  ],
   "properties": {
     "files": {
       "type": "array",
-      "items": { "$ref": "#/$defs/fileDiff" }
+      "items": {
+        "$ref": "#/$defs/fileDiff"
+      }
+    },
+    "comparisonFiles": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "comparisonBases": {
+      "type": "object"
     }
   },
   "$defs": {
     "fileDiff": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "status", "additions", "deletions", "hunks"],
+      "required": [
+        "path",
+        "status",
+        "additions",
+        "deletions",
+        "hunks"
+      ],
       "properties": {
-        "path": { "type": "string", "minLength": 1 },
-        "status": { "type": "string", "enum": ["added", "modified", "deleted", "renamed"] },
-        "additions": { "type": "integer", "minimum": 0 },
-        "deletions": { "type": "integer", "minimum": 0 },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "added",
+            "modified",
+            "deleted",
+            "renamed"
+          ]
+        },
+        "additions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "deletions": {
+          "type": "integer",
+          "minimum": 0
+        },
         "hunks": {
           "type": "array",
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["header", "lines"],
+            "required": [
+              "header",
+              "lines"
+            ],
             "properties": {
-              "header": { "type": "string", "minLength": 1 },
+              "header": {
+                "type": "string",
+                "minLength": 1
+              },
               "lines": {
                 "type": "array",
-                "items": { "type": "string" }
+                "items": {
+                  "type": "string"
+                }
               }
+            }
+          }
+        },
+        "oldPath": {
+          "type": "string"
+        },
+        "fingerprint": {
+          "type": "string"
+        },
+        "baseContent": {
+          "type": "object",
+          "required": [
+            "text",
+            "error"
+          ],
+          "properties": {
+            "text": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "missing": {
+              "type": "boolean"
+            }
+          }
+        },
+        "headContent": {
+          "type": "object",
+          "required": [
+            "text",
+            "error"
+          ],
+          "properties": {
+            "text": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "missing": {
+              "type": "boolean"
             }
           }
         }

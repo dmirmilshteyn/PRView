@@ -5,10 +5,15 @@
     "context": ".."
   },
   "workspaceFolder": "/workspaces/PRView",
-  "features": {
-    "ghcr.io/devcontainers/features/python:1": {},
-    "ghcr.io/devcontainer-community/devcontainer-features/astral.sh-uv:1": {},
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+  "initializeCommand": "sh .devcontainer/prepare-gh-auth.sh",
+  "mounts": [
+    "source=prview-codex-data,target=/root/.codex,type=volume",
+    "source=${localWorkspaceFolder}/.devcontainer/gh-auth,target=/run/gh-auth,type=bind,readonly",
+    "source=${localEnv:HOME}/.codex/auth.json,target=/root/.codex/auth.json,type=bind,readonly"
+  ],
+  "containerEnv": {
+    "GH_CONFIG_DIR": "/run/gh-auth",
+    "CODEX_HOME": "/root/.codex"
   },
   "forwardPorts": [9999],
   "portsAttributes": {

@@ -1,6 +1,8 @@
 import json
 import re
 import tempfile
+import hashlib
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -55,6 +57,7 @@ def build_summary(pull_request):
         "link": pull_request["url"],
         "title": pull_request["title"],
         "description": summarize_body(pull_request.get("body", "")),
+        "shortSummary": "",
     }
 
 
@@ -66,6 +69,14 @@ def build_details(repository, pull_request):
     return {
         **build_summary(pull_request),
         "repository": repository,
+        "stack": build_stack(pull_request.get("stack")),
+        "body": pull_request.get("body", ""),
+        "headSha": pull_request.get("headRefOid"),
+        "baseSha": pull_request.get("baseRefOid"),
+        "syncedAt": datetime.now(timezone.utc).isoformat(),
+        "checkRuns": pull_request.get("statusCheckRollup") or [],
+        "reviewRequests": pull_request.get("reviewRequests") or [],
+        "reviewHistory": pull_request.get("reviews") or [],
         "author": actor_name(pull_request.get("author")),
         "branch": pull_request["headRefName"],
         "baseBranch": pull_request["baseRefName"],
@@ -84,6 +95,26 @@ def build_details(repository, pull_request):
         "deletions": pull_request.get("deletions", 0),
         "commits": len(pull_request.get("commits") or []),
         "checks": checks,
+    }
+
+
+def build_stack(stack):
+    if not stack:
+        return None
+
+    return {
+        "number": stack["number"],
+        "baseBranch": stack["base"]["ref"],
+        "entries": [
+            {
+                "number": entry["number"],
+                "title": entry.get("title") or entry["head"]["ref"],
+                "branch": entry["head"]["ref"],
+                "state": "MERGED" if entry.get("merged_at") else entry["state"].upper(),
+                "draft": bool(entry.get("draft")),
+            }
+            for entry in stack["pull_requests"]
+        ],
     }
 
 
@@ -182,6 +213,7 @@ def finalize_file(file_data, stats_by_path):
 
     return {
         "path": path,
+        "oldPath": file_data["oldPath"],
         "status": status,
         "additions": stats.get("additions", count_diff_lines(file_data["hunks"], "+")),
         "deletions": stats.get("deletions", count_diff_lines(file_data["hunks"], "-")),
@@ -288,14 +320,47 @@ def format_status(review_decision, mergeable, checks):
     return "in-progress"
 
 
+def merge_groups(output_directory, repository, groups, details):
+    index = Path(output_directory) / "prs.json"
+    if not index.exists():
+        return groups
+    previous = json.loads(index.read_text())
+    merged = {key: list(items) for key, items in groups.items()}
+    for key, items in previous.items():
+        for item in items:
+            if item["number"] in details:
+                continue
+            detail_file = Path(output_directory) / "pr" / str(item["number"]) / "details.json"
+            if not detail_file.exists():
+                continue
+            existing = json.loads(detail_file.read_text())
+            if existing.get("repository", "").lower() == repository.lower():
+                merged.setdefault(key, []).append(item)
+    for items in merged.values():
+        items.sort(key=lambda item: item["number"], reverse=True)
+    return merged
+
+
 def write_artifacts(output_directory, groups, details, diffs):
     output_directory = Path(output_directory)
-    write_json(output_directory / "prs.json", groups)
 
     for number, pull_request_details in details.items():
+        repository = pull_request_details.get("repository", "unknown/repository")
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository) or any(part in (".", "..") for part in repository.split("/")):
+            raise ValueError("Invalid repository name")
+        for file in [*diffs[number]["files"], *diffs[number].get("comparisonFiles", [])]:
+            content = {key: value for key, value in file.items() if key != "fingerprint"}
+            file["fingerprint"] = hashlib.sha256(json.dumps(content, sort_keys=True).encode()).hexdigest()
+        revision = pull_request_details.get("headSha") or hashlib.sha256(json.dumps(diffs[number], sort_keys=True).encode()).hexdigest()
+        pull_request_details["revision"] = revision
+        write_json(output_directory / "history" / repository / str(number) / f"{revision}.json", {
+            "details": pull_request_details, "diff": diffs[number],
+        })
         pull_request_directory = output_directory / "pr" / str(number)
-        write_json(pull_request_directory / "details.json", pull_request_details)
         write_json(pull_request_directory / "diff.json", diffs[number])
+        write_json(pull_request_directory / "details.json", pull_request_details)
+
+    write_json(output_directory / "prs.json", groups)
 
 
 def write_json(destination, payload):

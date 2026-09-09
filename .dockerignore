@@ -1,3 +1,4 @@
 node_modules
 dist
 .git
+.devcontainer/gh-auth

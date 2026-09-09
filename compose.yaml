@@ -7,6 +7,26 @@ services:
     command: sh -lc "bun install --frozen-lockfile && bun run dev"
     ports:
       - "9999:9999"
+    environment:
+      GH_CONFIG_DIR: /run/gh-auth
+      CODEX_HOME: /root/.codex
     volumes:
       - .:/workspaces/PRView
       - /workspaces/PRView/node_modules
+      - codex-data:/root/.codex
+      - type: bind
+        source: ./.devcontainer/gh-auth
+        target: /run/gh-auth
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${HOME}/.codex/auth.json
+        target: /root/.codex/auth.json
+        read_only: true
+        bind:
+          create_host_path: false
+
+volumes:
+  codex-data:
+    name: prview-codex-data

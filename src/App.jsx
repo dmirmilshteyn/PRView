@@ -3,6 +3,7 @@ import { createHighlighter } from "shiki";
 import { Link, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import pullRequests from "../artifacts/prs.json";
 import { getLanguage } from "./review/review-model";
+import ReviewProgress from "./review/ReviewProgress";
 import { useReviewState } from "./review/use-review-state";
 
 const prDetails = import.meta.glob("../artifacts/pr/*/details.json", {
@@ -218,6 +219,7 @@ function PullRequestDetail() {
 function DiffViewer({ diff, pullRequestNumber }) {
   const {
     collapsedFiles,
+    resetReview,
     reviewedFiles,
     setFileReviewed,
     toggleFileCollapsed,
@@ -232,6 +234,7 @@ function DiffViewer({ diff, pullRequestNumber }) {
         </div>
         <span className="total-count">{diff.files.length} file{diff.files.length === 1 ? "" : "s"}</span>
       </div>
+      <ReviewProgress files={diff.files} onReset={resetReview} reviewedFiles={reviewedFiles} />
       <div className="diff-files">
         {diff.files.map((file) => (
           <article className="diff-file" key={file.path}>

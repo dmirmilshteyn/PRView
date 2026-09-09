@@ -75,9 +75,9 @@ function PullRequestGroups() {
           <section className="pr-group" key={category.key}>
             <div className="group-heading">
               <div className="group-title">
-                <span className={`status-dot ${category.accent}`} />
+                <span aria-hidden="true" className={`status-dot ${category.accent}`} />
                 <h2>{category.label}</h2>
-                <span className="count">{items.length}</span>
+                <span aria-label={`${items.length} pull requests`} className="count">{items.length}</span>
               </div>
             </div>
             <div className="pr-list">

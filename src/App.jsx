@@ -192,6 +192,10 @@ function PullRequestDetail() {
           <dd>{details.assignees.join(", ")}</dd>
         </div>
         <div>
+          <dt>Reviewers</dt>
+          <dd>{details.reviewers.length > 0 ? details.reviewers.join(", ") : "Unassigned"}</dd>
+        </div>
+        <div>
           <dt>Milestone</dt>
           <dd>{details.milestone}</dd>
         </div>

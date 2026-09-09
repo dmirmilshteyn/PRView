@@ -5,6 +5,7 @@ dist
 /artifacts/
 /.local-reviews/
 /.pr-chats/
+/.pr-tours/
 /.devcontainer/gh-auth/
 __pycache__/
 prs.json

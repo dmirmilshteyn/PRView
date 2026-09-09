@@ -7,7 +7,7 @@ import DiffFile from "./DiffFile.jsx";
 import NoteThreads, { newDraft } from "./NoteThreads.jsx";
 import Markdown from "./Markdown.jsx";
 
-export default function ReviewWorkspace({ details, diff, revisions }) {
+export default function ReviewWorkspace({ details, diff, revisions, active, navigationTarget }) {
   const { state, ready, status, error, update, retry } = useLocalReview();
   const [viewedRevision, setViewedRevision] = useState(details.revision);
   const [query, setQuery] = useState("");
@@ -18,6 +18,7 @@ export default function ReviewWorkspace({ details, diff, revisions }) {
   const fileElements = useRef(new Map());
   const positionRef = useRef(null);
   const updateRef = useRef(update);
+  const lastNavigation = useRef(null);
   updateRef.current = update;
   const snapshot = revisions[viewedRevision] ?? { details, diff };
   const revision = snapshot.details.revision;
@@ -29,7 +30,7 @@ export default function ReviewWorkspace({ details, diff, revisions }) {
   const reviewedCount = snapshot.diff.files.filter(isReviewed).length;
 
   useEffect(() => {
-    if (!ready || restored || jumpTarget) {
+    if (!active || !ready || restored || jumpTarget) {
       return;
     }
     const saved = state.positions[revision];
@@ -44,10 +45,10 @@ export default function ReviewWorkspace({ details, diff, revisions }) {
       setRestored(true);
     });
     return () => cancelAnimationFrame(frame);
-  }, [ready, restored, revision, state.positions, jumpTarget]);
+  }, [active, ready, restored, revision, state.positions, jumpTarget]);
 
   useEffect(() => {
-    if (!ready || !jumpTarget) {
+    if (!active || !ready || !jumpTarget) {
       return;
     }
     const frame = requestAnimationFrame(() => {
@@ -59,10 +60,10 @@ export default function ReviewWorkspace({ details, diff, revisions }) {
       setJumpTarget(null);
     });
     return () => cancelAnimationFrame(frame);
-  }, [ready, jumpTarget, revision]);
+  }, [active, ready, jumpTarget, revision]);
 
   useEffect(() => {
-    if (!ready || !restored) {
+    if (!active || !ready || !restored) {
       return;
     }
     let timer;
@@ -89,7 +90,7 @@ export default function ReviewWorkspace({ details, diff, revisions }) {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("pagehide", savePosition);
     };
-  }, [ready, restored, revision]);
+  }, [active, ready, restored, revision]);
 
   function goTo(filePath) {
     const view = state.fileViews?.[draftKey(revision, filePath)] ?? { context: 3, full: false, fullSide: "RIGHT" };
@@ -138,8 +139,15 @@ export default function ReviewWorkspace({ details, diff, revisions }) {
   }
 
   useEffect(() => {
+    if (active && ready && navigationTarget && lastNavigation.current !== navigationTarget) {
+      lastNavigation.current = navigationTarget;
+      jumpToNote({ revision: navigationTarget.revision, filePath: navigationTarget.path, anchor: { side: navigationTarget.side, start: navigationTarget.start, end: navigationTarget.end, excerpt: navigationTarget.excerpt } });
+    }
+  }, [active, ready, navigationTarget]);
+
+  useEffect(() => {
     function onKeyDown(event) {
-      if (!ready || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.target.closest("input, textarea, select, [contenteditable=true]")) {
+      if (!active || !ready || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.target.closest("input, textarea, select, [contenteditable=true]")) {
         return;
       }
       if (event.key.toLowerCase() === "n") {
@@ -149,7 +157,7 @@ export default function ReviewWorkspace({ details, diff, revisions }) {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [ready, files, query, selectedFile, state.reviewed]);
+  }, [active, ready, files, query, selectedFile, state.reviewed]);
 
   if (!ready) {
     return <div className="review-loading">{error ? <><p role="alert">{error}</p><button onClick={retry}>Retry loading review</button></> : "Loading review…"}</div>;

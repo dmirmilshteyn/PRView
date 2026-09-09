@@ -1,6 +1,6 @@
 "use client";
 
-import ReviewWorkspace from "./review/ReviewWorkspace.jsx";
+import CodeTour from "./review/CodeTour.jsx";
 import ReviewProvider from "./review/ReviewProvider.jsx";
 import PinProvider, { usePins } from "./review/PinProvider.jsx";
 import PinButton from "./review/PinButton.jsx";
@@ -253,10 +253,7 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
             </div>
           </dl>
         </section>
-        <section className="pr-page-section" id="code" aria-labelledby="code-heading">
-          <h2 className="pr-section-heading" id="code-heading">Code</h2>
-          <ReviewWorkspace key={`${details.repository}:${number}`} details={details} diff={diff ?? { files: [] }} revisions={revisions} />
-        </section>
+        <CodeTour key={`${details.repository}:${number}`} details={details} diff={diff ?? { files: [] }} revisions={revisions} />
     </article>
     </ReviewChat>
     </ReviewProvider>

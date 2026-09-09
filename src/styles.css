@@ -344,7 +344,66 @@ h1 {
 .diff-files {
   display: grid;
   gap: 1rem;
+}
+
+.review-workspace {
+  align-items: start;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 12rem minmax(0, 1fr);
   margin-top: 1rem;
+}
+
+.file-navigator {
+  background: rgba(16, 25, 33, 0.82);
+  border: 1px solid #253542;
+  border-radius: 0.55rem;
+  display: block;
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  padding: 0.8rem;
+  position: sticky;
+  top: 1rem;
+}
+
+.file-navigator p {
+  color: #718495;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.55rem;
+  text-transform: uppercase;
+}
+
+.file-navigator ol {
+  display: grid;
+  gap: 0.2rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.file-navigator a {
+  align-items: flex-start;
+  border-radius: 0.3rem;
+  color: #9eabb8;
+  display: flex;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.68rem;
+  gap: 0.4rem;
+  overflow-wrap: anywhere;
+  padding: 0.35rem;
+}
+
+.file-navigator a:hover,
+.file-navigator a:focus-visible {
+  background: #172633;
+  color: #d6dfe7;
+}
+
+.file-navigator-status {
+  color: #76d3b2;
+  flex: 0 0 auto;
 }
 
 .review-progress {
@@ -552,5 +611,14 @@ h1 {
   .review-progress-track {
     grid-column: 1 / -1;
     grid-row: 2;
+  }
+
+  .review-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .file-navigator {
+    max-height: 12rem;
+    position: static;
   }
 }

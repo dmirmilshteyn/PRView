@@ -1,50 +1,62 @@
+"use client";
+
 import { useEffect, useState } from "react";
 import { createHighlighter } from "shiki";
-import { Link, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
-import pullRequests from "../artifacts/prs.json";
-
-const prDetails = import.meta.glob("../artifacts/pr/*/details.json", {
-  eager: true,
-  import: "default",
-});
-const prDiffs = import.meta.glob("../artifacts/pr/*/diff.json", {
-  eager: true,
-  import: "default",
-});
+import Link from "next/link";
+import { useParams, usePathname } from "next/navigation";
 
 const categories = [
-  { key: "needsReview", label: "Needs review", accent: "amber" },
-  { key: "inProgress", label: "In progress", accent: "blue" },
-  { key: "readyToMerge", label: "Ready to merge", accent: "green" },
+  { key: "yourChanges", label: "Your changes", accent: "purple" },
+  { key: "needsYourReview", label: "Needs your review", accent: "amber", aliases: ["needsReview"] },
+  { key: "returnedToYou", label: "Returned to you", accent: "red" },
+  { key: "approved", label: "Approved", accent: "green", aliases: ["readyToMerge"] },
+  { key: "waitingForReviewers", label: "Waiting for reviewers", accent: "blue", aliases: ["inProgress"] },
+  { key: "drafts", label: "Drafts", accent: "slate" },
+  { key: "waitingForAuthor", label: "Waiting for author", accent: "orange" },
 ];
 
-function Layout() {
-  const location = useLocation();
+function getCategoryItems(pullRequests, category) {
+  const keys = [category.key, ...(category.aliases ?? [])];
+
+  for (const key of keys) {
+    if (pullRequests[key]) {
+      return pullRequests[key];
+    }
+  }
+
+  return [];
+}
+
+function Layout({ pullRequests, prDetails, prDiffs }) {
+  const pathname = usePathname();
+  const isPullRequestsPage = pathname === "/pull-requests";
+  const isDetailPage = pathname.startsWith("/pull-requests/");
 
   return (
     <div className="app-shell">
       <header className="topbar">
-        <Link className="brand" to="/">
+        <Link className="brand" href="/">
           <span className="brand-mark">+</span>
           PRView
         </Link>
         <nav aria-label="Main navigation">
-          <Link className={location.pathname === "/" ? "active" : ""} to="/">
+          <Link className={pathname === "/" ? "active" : ""} href="/">
             Dashboard
           </Link>
-          <Link className={location.pathname === "/pull-requests" ? "active" : ""} to="/pull-requests">
+          <Link className={isPullRequestsPage || isDetailPage ? "active" : ""} href="/pull-requests">
             Pull requests
           </Link>
         </nav>
       </header>
 
       <main className="content">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/pull-requests" element={<PullRequests />} />
-          <Route path="/pull-requests/:number" element={<PullRequestDetail />} />
-          <Route path="*" element={<Navigate replace to="/" />} />
-        </Routes>
+        {isDetailPage ? (
+          <PullRequestDetail pullRequests={pullRequests} prDetails={prDetails} prDiffs={prDiffs} />
+        ) : isPullRequestsPage ? (
+          <PullRequests pullRequests={pullRequests} />
+        ) : (
+          <Dashboard pullRequests={pullRequests} />
+        )}
       </main>
     </div>
   );
@@ -52,7 +64,7 @@ function Layout() {
 
 function PullRequestCard({ pullRequest }) {
   return (
-    <Link className="pr-card" to={`/pull-requests/${pullRequest.number}`}>
+    <Link className="pr-card" href={`/pull-requests/${pullRequest.number}`}>
       <div className="pr-card-header">
         <span className="pr-number">#{pullRequest.number}</span>
         <span className="card-arrow" aria-hidden="true">
@@ -65,11 +77,11 @@ function PullRequestCard({ pullRequest }) {
   );
 }
 
-function PullRequestGroups() {
+function PullRequestGroups({ pullRequests }) {
   return (
     <div className="pr-groups">
       {categories.map((category) => {
-        const items = pullRequests[category.key] ?? [];
+        const items = getCategoryItems(pullRequests, category);
 
         return (
           <section className="pr-group" key={category.key}>
@@ -94,8 +106,8 @@ function PullRequestGroups() {
   );
 }
 
-function Dashboard() {
-  const totalPullRequests = categories.reduce((total, category) => total + (pullRequests[category.key]?.length ?? 0), 0);
+function Dashboard({ pullRequests }) {
+  const totalPullRequests = categories.reduce((total, category) => total + getCategoryItems(pullRequests, category).length, 0);
 
   return (
     <section>
@@ -107,12 +119,12 @@ function Dashboard() {
         <span className="total-count">{totalPullRequests} open</span>
       </div>
       <p className="lede">A focused view of the pull requests that need your attention.</p>
-      <PullRequestGroups />
+      <PullRequestGroups pullRequests={pullRequests} />
     </section>
   );
 }
 
-function PullRequests() {
+function PullRequests({ pullRequests }) {
   return (
     <section>
       <div className="page-heading">
@@ -121,26 +133,34 @@ function PullRequests() {
           <h1>All pull requests</h1>
         </div>
       </div>
-      <PullRequestGroups />
+      <PullRequestGroups pullRequests={pullRequests} />
     </section>
   );
 }
 
-function PullRequestDetail() {
+function PullRequestDetail({ pullRequests, prDetails, prDiffs }) {
   const { number } = useParams();
   const pullRequest = categories
-    .flatMap((category) => pullRequests[category.key] ?? [])
+    .flatMap((category) => getCategoryItems(pullRequests, category))
     .find((item) => String(item.number) === number);
-  const details = prDetails[`../artifacts/pr/${number}/details.json`];
-  const diff = prDiffs[`../artifacts/pr/${number}/diff.json`];
+  const details = prDetails[number];
+  const diff = prDiffs[number];
 
   if (!pullRequest || !details) {
-    return <Navigate replace to="/pull-requests" />;
+    return (
+      <div className="empty-page">
+        <p className="eyebrow">Not found</p>
+        <h1>Pull request not found</h1>
+        <Link className="back-link" href="/pull-requests">
+          ← Back to pull requests
+        </Link>
+      </div>
+    );
   }
 
   return (
     <article className="pr-detail">
-      <Link className="back-link" to="/pull-requests">
+      <Link className="back-link" href="/pull-requests">
         ← Back to pull requests
       </Link>
       <p className="eyebrow">Pull request #{pullRequest.number}</p>
@@ -350,6 +370,6 @@ function getLanguage(filePath) {
   return languages[extension] ?? "text";
 }
 
-export default function App() {
-  return <Layout />;
+export default function App({ pullRequests, prDetails, prDiffs }) {
+  return <Layout pullRequests={pullRequests} prDetails={prDetails} prDiffs={prDiffs} />;
 }

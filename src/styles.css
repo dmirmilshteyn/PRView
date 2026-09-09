@@ -162,6 +162,22 @@ h1 {
   background: #76d3b2;
 }
 
+.status-dot.purple {
+  background: #b899ed;
+}
+
+.status-dot.red {
+  background: #ed8f8f;
+}
+
+.status-dot.slate {
+  background: #9eabb8;
+}
+
+.status-dot.orange {
+  background: #e99b69;
+}
+
 .pr-list {
   display: grid;
   gap: 0.65rem;

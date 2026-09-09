@@ -347,6 +347,58 @@ h1 {
   margin-top: 1rem;
 }
 
+.review-progress {
+  align-items: center;
+  display: grid;
+  gap: 0.75rem 1rem;
+  grid-template-columns: minmax(10rem, auto) minmax(8rem, 1fr) auto;
+  margin-top: 1rem;
+}
+
+.review-progress-copy {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.review-progress-copy strong {
+  font-size: 0.82rem;
+}
+
+.review-progress-copy span {
+  color: #718495;
+  font-size: 0.72rem;
+}
+
+.review-progress-track {
+  background: #22303d;
+  border-radius: 999px;
+  height: 0.4rem;
+  overflow: hidden;
+}
+
+.review-progress-track span {
+  background: #76d3b2;
+  display: block;
+  height: 100%;
+  transition: width 180ms ease;
+}
+
+.review-progress button {
+  background: transparent;
+  border: 1px solid #2a3a48;
+  border-radius: 0.35rem;
+  color: #aab7c2;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 0.4rem 0.65rem;
+}
+
+.review-progress button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 .diff-file {
   background: #101921;
   border: 1px solid #253542;
@@ -491,5 +543,14 @@ h1 {
   .file-actions {
     justify-content: space-between;
     width: 100%;
+  }
+
+  .review-progress {
+    grid-template-columns: 1fr auto;
+  }
+
+  .review-progress-track {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 }

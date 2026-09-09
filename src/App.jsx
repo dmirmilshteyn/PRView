@@ -94,6 +94,10 @@ function PullRequestGroups() {
   );
 }
 
+function formatOpenCount(count) {
+  return `${count} open pull request${count === 1 ? "" : "s"}`;
+}
+
 function Dashboard() {
   const totalPullRequests = categories.reduce((total, category) => total + (pullRequests[category.key]?.length ?? 0), 0);
 
@@ -104,7 +108,7 @@ function Dashboard() {
           <p className="eyebrow">Review queue</p>
           <h1>Pull requests</h1>
         </div>
-        <span className="total-count">{totalPullRequests} open</span>
+        <span className="total-count">{formatOpenCount(totalPullRequests)}</span>
       </div>
       <p className="lede">A focused view of the pull requests that need your attention.</p>
       <PullRequestGroups />

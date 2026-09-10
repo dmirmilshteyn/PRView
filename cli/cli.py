@@ -5,6 +5,7 @@ from pathlib import Path
 
 from cli.artifacts import build_artifacts, merge_groups, write_artifacts
 from cli.github import GitHubClient
+from cli.repositories import preserve_legacy_imports, read_workspace, register_repository, repository_path, workspace_lock
 
 
 def build_parser():
@@ -38,6 +39,19 @@ def build_parser():
         help="Optional maximum open PRs to select with --all (stack members are never limited)",
     )
     sync_parser.set_defaults(handler=sync_repository)
+    track_parser = subparsers.add_parser("track", help="Track a PR and its native stack")
+    track_parser.add_argument("repository", help="GitHub repository in OWNER/REPO form or a GitHub URL")
+    track_parser.add_argument("number", type=positive_integer)
+    track_parser.add_argument("--output", type=Path, default=Path("artifacts"))
+    track_parser.set_defaults(handler=track_repository, all=False, limit=None)
+    repo_parser = subparsers.add_parser("repo", help="Register, list, or select repositories")
+    repo_commands = repo_parser.add_subparsers(dest="repo_command", required=True)
+    for command in ("list", "use", "track"):
+        sub = repo_commands.add_parser(command)
+        if command != "list":
+            sub.add_argument("repository", help="OWNER/REPO")
+        sub.add_argument("--output", type=Path, default=Path("artifacts"))
+        sub.set_defaults(handler=manage_repository)
     return parser
 
 
@@ -78,12 +92,49 @@ def select_pull_requests(client, repository, number, limit):
     return pull_requests
 
 
+def track_repository(options):
+    return sync_repository(options)
+
+
+def manage_repository(options):
+    try:
+        with workspace_lock(options.output):
+            preserve_legacy_imports(options.output)
+            workspace = read_workspace(options.output)
+            if options.repo_command == "list":
+                for repository in workspace["repositories"]:
+                    print(f"{'*' if repository == workspace['activeRepository'] else ' '} {repository}")
+                return 0
+            repository_path(options.output, options.repository)
+            repository = next((item for item in workspace["repositories"] if item.lower() == options.repository.lower()), None)
+            if not repository:
+                if options.repo_command == "use":
+                    raise ValueError("Repository is not tracked. Run 'pr repo track OWNER/REPO' first.")
+                repository = GitHubClient().get_repository_name(options.repository)
+            register_repository(options.output, repository)
+            print(f"Selected {repository}")
+            return 0
+    except (OSError, RuntimeError, ValueError) as error:
+        print(f"pr: {error}", file=sys.stderr)
+        return 1
+
+
 def sync_repository(options):
+    try:
+        with workspace_lock(options.output):
+            return sync_locked(options)
+    except (OSError, RuntimeError, ValueError) as error:
+        print(f"pr: {error}", file=sys.stderr)
+        return 1
+
+
+def sync_locked(options):
     try:
         if options.number is not None and options.limit is not None:
             raise ValueError("--limit can only be used with --all")
         client = GitHubClient()
         repository = client.get_repository_name(options.repository)
+        preserve_legacy_imports(options.output)
         viewer_login = client.get_viewer_login()
         pull_requests = select_pull_requests(client, repository, options.number, options.limit)
         diffs = {
@@ -137,6 +188,10 @@ def sync_repository(options):
         if not options.all:
             groups = merge_groups(options.output, repository, groups, details)
         write_artifacts(options.output, groups, details, parsed_diffs)
+        if not details:
+            from cli.artifacts import write_json
+            write_json(repository_path(options.output, repository) / "prs.json", groups)
+            register_repository(options.output, repository)
     except (OSError, RuntimeError, ValueError) as error:
         print(f"pr: {error}", file=sys.stderr)
         return 1

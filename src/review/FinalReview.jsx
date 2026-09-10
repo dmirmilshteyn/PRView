@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { pullUrl } from "../routes.js";
 import { useLocalReview } from "./ReviewProvider.jsx";
 import ReviewSubmissionPreview from "./ReviewSubmissionPreview.jsx";
 
@@ -19,9 +20,9 @@ export default function FinalReview({ revision, currentRevision, reviewedCount, 
     }
     if (state.reviews?.some((review) => review.id === submittedId && review.event === "APPROVE" && review.github?.status === "submitted")) {
       navigated.current = submittedId;
-      router.push(`/pull-requests/${nextPR.number}#top`, { scroll: true });
+      router.push(`${pullUrl(repository, nextPR.number)}#top`, { scroll: true });
     }
-  }, [submittedId, status, error, nextPR, state.reviews, router]);
+  }, [submittedId, status, error, nextPR, state.reviews, router, repository]);
   const options = [
     { event: "COMMENT", label: "Comment", description: "Leave review feedback.", icon: "◇" },
     { event: "REQUEST_CHANGES", label: "Request changes", description: "Describe what needs to change.", icon: "↻" },

@@ -4,6 +4,7 @@ import ReviewerDialog from "./ReviewerDialog.jsx";
 import HotkeyHelp from "./HotkeyHelp.jsx";
 import { createHotkeyMatcher } from "./hotkey-matcher.js";
 import { useRouter } from "next/navigation";
+import { pullUrl } from "../routes.js";
 import { nextStackPullRequest, previousStackPullRequest } from "../stack/stack.js";
 
 export default function PRHotkeys({ link, repository, number, onAssigned, onReviewerRequested, stack }) {
@@ -47,7 +48,7 @@ export default function PRHotkeys({ link, repository, number, onAssigned, onRevi
         reset();
         if (target) {
           event.preventDefault();
-          router.push(`/pull-requests/${target.number}#top`, { scroll: true });
+          router.push(`${pullUrl(repository, target.number)}#top`, { scroll: true });
         }
         return;
       }

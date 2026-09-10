@@ -1,4 +1,5 @@
 import path from "node:path";
+import { repositoryArtifacts } from "../../../lib/repositories.js";
 import { readFile } from "node:fs/promises";
 import { chatKey } from "../../../lib/chat-store.js";
 import { runCodex } from "../../../lib/codex-chat.js";
@@ -52,7 +53,7 @@ export async function POST(request) {
     }
     const { repository, number, revision, baseSha, retry } = JSON.parse(text);
     const prKey = chatKey(repository, number);
-    const folder = path.join(process.cwd(), "artifacts", "pr", String(number));
+    const folder = path.join(repositoryArtifacts(process.cwd(), repository), "pr", String(number));
     const details = JSON.parse(await readFile(path.join(folder, "details.json"), "utf8"));
     if (details.repository.toLowerCase() !== repository.toLowerCase()) {
       throw new Error("PR repository does not match");

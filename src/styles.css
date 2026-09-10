@@ -45,6 +45,12 @@
 .top-review-button { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.35rem 0.65rem; background: #224d3a; border: 1px solid #47735d; border-radius: 5px; color: #e0f3e8; font: inherit; font-size: 0.8rem; cursor: pointer; }
 .top-review-button:hover:not(:disabled) { background: #2d624a; border-color: #71b48d; }
 .top-review-button:disabled { opacity: 0.5; cursor: default; }
+.repository-controls { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-right: auto; min-width: 0; }
+.repository-controls select { max-width: min(300px, 65vw); padding: 0.4rem 0.6rem; border: 1px solid #344b5b; border-radius: 6px; background: #15232e; color: #d5e5ed; font: inherit; font-size: 0.8rem; }
+.repository-form { display: grid; gap: 1rem; }
+.repository-form label { display: grid; gap: 0.4rem; font-size: 0.85rem; }
+.repository-form input { padding: 0.65rem; border: 1px solid #405463; border-radius: 6px; background: #0d1720; color: #e8eef5; font: inherit; min-width: 0; }
+.repository-controls :focus-visible { outline: 2px solid #86dec0; outline-offset: 3px; }
 .dashboard-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; margin-top: 0.65rem; font-size: 0.8rem; }
 .dashboard-filters input[type="search"], .dashboard-filters select { min-width: 0; max-width: 100%; padding: 0.4rem 0.5rem; background: #131e29; color: #d4e0ec; border: 1px solid #344656; border-radius: 5px; font: inherit; }
 .dashboard-filters input[type="search"] { flex: 1 1 160px; }
@@ -399,6 +405,8 @@ a {
 
 .main-nav {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 1.5rem;
   justify-content: flex-end;
   padding: 1.25rem clamp(1.25rem, 5vw, 5rem) 0;

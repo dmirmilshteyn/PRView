@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { pullUrl } from "../routes.js";
 import { hasMergeConflict, stackEntryStatus, stackReviewProgress, nextStackPullRequest, previousStackPullRequest } from "./stack.js";
 import PRStatusBadge from "./PRStatusBadge.jsx";
 import { useLocalReview } from "../review/ReviewProvider.jsx";
@@ -16,8 +17,8 @@ export default function StackNavigator({ stack, repository, currentNumber }) {
   return <nav className="pr-stack" aria-label="Pull request stack">
     <div className="stack-heading"><span>Stack{stack.number ? ` #${stack.number}` : ""}</span><span>{entries.filter((entry) => entry.reviewProgress === "reviewed").length} of {entries.length} reviewed</span></div>
     <div className="stack-review-navigation">
-      {previous ? <Link className="pr-pin" href={`/pull-requests/${previous.number}#top`}>← Previous PR #{previous.number}</Link> : <span className="review-muted">Start of stack</span>}
-      {next ? <Link className="pr-pin" href={`/pull-requests/${next.number}#top`}>Next PR #{next.number} →</Link> : <span className="review-muted">End of stack</span>}
+      {previous ? <Link className="pr-pin" href={`${pullUrl(repository, previous.number)}#top`}>← Previous PR #{previous.number}</Link> : <span className="review-muted">Start of stack</span>}
+      {next ? <Link className="pr-pin" href={`${pullUrl(repository, next.number)}#top`}>Next PR #{next.number} →</Link> : <span className="review-muted">End of stack</span>}
     </div>
     <ol className="stack-entries">
       {entries.map((entry) => {
@@ -37,7 +38,7 @@ export default function StackNavigator({ stack, repository, currentNumber }) {
           </span>
         </>;
         return <li key={entry.number} className={current ? "stack-current" : ""}>
-          {entry.available ? <Link className="stack-entry" href={`/pull-requests/${entry.number}`} aria-current={current ? "page" : undefined}>{contents}</Link> : <a className="stack-entry" href={`https://github.com/${repository}/pull/${entry.number}`} target="_blank" rel="noreferrer">{contents}</a>}
+          {entry.available ? <Link className="stack-entry" href={pullUrl(repository, entry.number)} aria-current={current ? "page" : undefined}>{contents}</Link> : <a className="stack-entry" href={`https://github.com/${repository}/pull/${entry.number}`} target="_blank" rel="noreferrer">{contents}</a>}
         </li>;
       })}
     </ol>

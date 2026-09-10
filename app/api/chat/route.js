@@ -1,4 +1,5 @@
 import path from "node:path";
+import { repositoryArtifacts } from "../../../lib/repositories.js";
 import { readFile } from "node:fs/promises";
 import { chatKey, createChatStore } from "../../../lib/chat-store.js";
 import { createChatServiceWithRuntime, reviewChatMetadata } from "../../../lib/chat-service.js";
@@ -21,7 +22,7 @@ const service = createChatServiceWithRuntime(chatRuntime.store, runCodex, chatRu
 
 async function pullRequest(repository, number) {
   const key = chatKey(repository, number);
-  const folder = path.join(process.cwd(), "artifacts", "pr", String(number));
+  const folder = path.join(repositoryArtifacts(process.cwd(), repository), "pr", String(number));
   const details = JSON.parse(await readFile(path.join(folder, "details.json"), "utf8"));
   if (details.repository.toLowerCase() !== repository.toLowerCase()) {
     throw new Error("PR repository does not match");

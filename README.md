@@ -12,7 +12,7 @@ The image includes Bun, Python, uv and the GitHub CLI. To rebuild and restart th
 bun run dev
 ```
 
-The app uses the Next.js App Router with `/`, `/pull-requests`, and `/pull-requests/:number` routes.
+The app uses GitHub-style URLs: `/<owner>/<repo>` for the dashboard, `/<owner>/<repo>/pulls` for the PR list, and `/<owner>/<repo>/pull/<number>` for a PR. The repository in the URL determines which imports are displayed, so bookmarks and separate tabs remain stable when you switch repositories. `/` opens the last selected repository; old `/pull-requests` links redirect to that repository's new URLs.
 
 ## Syncing pull requests
 
@@ -24,6 +24,16 @@ Run the CLI from the repository root inside the devcontainer:
 # Show available commands and sync options
 uv run ./pr --help
 uv run ./pr sync --help
+
+# Register a repository for the switcher (without importing PRs)
+uv run ./pr repo track dmirmilshteyn/PRView
+
+# Track one PR and its native stack; the repository is always required
+uv run ./pr track dmirmilshteyn/PRView 23
+
+# List repositories or switch to one already registered
+uv run ./pr repo list
+uv run ./pr repo use dmirmilshteyn/PRView
 
 # Sync one PR (automatically includes its entire native GitHub stack)
 uv run ./pr sync dmirmilshteyn/PRView 23
@@ -50,7 +60,11 @@ docker compose exec prview uv run ./pr sync dmirmilshteyn/PRView --all
 
 Supply either a positive PR number or `--all`, never both. `--limit` accepts a positive number and requires `--all`; there is no default limit. Stack membership comes only from native GitHub metadata, and every member is included, even closed or merged PRs. PRs without that metadata sync individually.
 
-By default, the command writes `artifacts/prs.json` plus `details.json` and `diff.json` under `artifacts/pr/<number>/`. A targeted sync preserves other imported PRs from the same repository. `--all` refreshes the dashboard list. `--output` changes the destination for that invocation; it does not change the app's artifact directory.
+Both `track` and `sync` require an explicit repository. Tracking uses the same import as targeted sync and preserves other imported PRs. These commands register and select the imported repository. `repo track` verifies and registers a repository without importing PRs; `repo use` selects an already registered repository without contacting GitHub.
+
+The dashboard has a **Track PR** button for importing a PR by number and a repository switcher with **Add repository…**. Switching reads cached imports and never starts polling or a sync. The selection is saved for this local workspace.
+
+Imports live under `artifacts/repos/<owner>/<repo>/`, with `prs.json` and `pr/<number>/{details,diff}.json`. Repository paths are lowercase. `artifacts/workspace.json` records registered repositories and the active selection. Existing imports are copied into this structure automatically on the first CLI operation. The root `artifacts/prs.json` and `artifacts/pr/` remain compatibility copies of the latest import. `--all` refreshes only the specified repository's dashboard list. `--output` changes the destination for that invocation; it does not change the app's artifact directory.
 
 Sync includes the complete Markdown description, review requests and decisions, checks with detail links, issue discussion, and inline GitHub threads with replies and resolution state. It also fetches changed files at the diff's merge base and head commit for expanded context and full-file viewing. Binary, oversized and unavailable files retain an explicit context-unavailable message. A PR changing during import causes sync to fail so it can be retried consistently.
 
@@ -76,7 +90,7 @@ Sync includes the complete Markdown description, review requests and decisions, 
 
 Imported snapshots live in `artifacts/history/OWNER/REPO/NUMBER/COMMIT.json`. Personal review data lives separately in `.local-reviews/<repository-hash>/<number>.json`; both directories are ignored by Git. Sync never writes `.local-reviews`. Back up that directory to retain your work. Local updates use serialized, atomic file replacement within the single running app server. There is no user authentication or shared multi-server storage.
 
-The active dashboard displays one imported repository at a time. Local review state and historical snapshots are isolated by repository and PR number. Existing artifacts without commit/content data still display their imported patches; sync again for full context, and capture at least two revisions to compare changes over time. Legacy file comments in `artifacts/comments.json` are preserved and displayed separately because they did not record a repository or commit.
+The active dashboard displays the repository selected in the switcher. Imports, local review state, and historical snapshots are isolated by repository and PR number. Existing artifacts without commit/content data still display their imported patches; sync again for full context, and capture at least two revisions to compare changes over time. Legacy file comments in `artifacts/comments.json` are preserved with the previously active repository and displayed separately because they did not record a repository or commit.
 
 Use **Restart** in the PR chat header to start a fresh conversation. It archives the old transcript under `.pr-chats/history/<repository-hash>/<PR>/<restart-id>.json`, clears the active session, and preserves your unsent message and attachments. Restart is disabled while Luna is responding; interrupted sessions can be restarted. The next message starts a new session with the current PR context.
 
@@ -94,7 +108,7 @@ python3 -m unittest discover -s tests -v
 bun run build
 ```
 
-For a deterministic browser fixture without GitHub access, run `python3 -m tests.create_demo artifacts`, then open `/pull-requests/900001`. This adds a clearly labeled local demo PR and two commit snapshots while preserving existing PRs. It contains a full description, discussions, detailed checks, whitespace-only changes and a changed file between revisions.
+For a deterministic browser fixture without GitHub access, run `python3 -m tests.create_demo artifacts`, then open PR #900001 in the selected repository. This adds a clearly labeled local demo PR and two commit snapshots while preserving existing PRs. It contains a full description, discussions, detailed checks, whitespace-only changes and a changed file between revisions.
 
 Inline comment composers and saved code threads have a **Send to chat** button. Collect code ranges with or without comments as attachments, inspect or remove them in the chat composer, then add a question and send the batch to Luna. Draft comments sent this way are not saved as PR comments. Sent attachments retain their code excerpts, before/after side, and revision in the conversation history. Unsent messages and attachments persist in browser local storage per repository and PR, including across reloads and PR switches. Successful sends clear only the submitted draft/context, and retry identifiers survive reloads to avoid duplicate messages.
 

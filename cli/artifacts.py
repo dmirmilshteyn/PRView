@@ -324,6 +324,10 @@ def format_status(review_decision, mergeable, checks):
 
 
 def merge_groups(output_directory, repository, groups, details):
+    from cli.repositories import repository_path
+    scoped = repository_path(output_directory, repository)
+    if (scoped / "prs.json").exists():
+        output_directory = scoped
     index = Path(output_directory) / "prs.json"
     if not index.exists():
         return groups
@@ -345,7 +349,9 @@ def merge_groups(output_directory, repository, groups, details):
 
 
 def write_artifacts(output_directory, groups, details, diffs):
+    from cli.repositories import preserve_legacy_imports, register_repository, repository_path
     output_directory = Path(output_directory)
+    preserve_legacy_imports(output_directory)
 
     for number, pull_request_details in details.items():
         repository = pull_request_details.get("repository", "unknown/repository")
@@ -362,8 +368,14 @@ def write_artifacts(output_directory, groups, details, diffs):
         pull_request_directory = output_directory / "pr" / str(number)
         write_json(pull_request_directory / "diff.json", diffs[number])
         write_json(pull_request_directory / "details.json", pull_request_details)
+        scoped = repository_path(output_directory, repository)
+        write_json(scoped / "pr" / str(number) / "diff.json", diffs[number])
+        write_json(scoped / "pr" / str(number) / "details.json", pull_request_details)
 
     write_json(output_directory / "prs.json", groups)
+    for repository in {detail.get("repository", "unknown/repository") for detail in details.values()}:
+        write_json(repository_path(output_directory, repository) / "prs.json", groups)
+        register_repository(output_directory, repository)
 
 
 def write_json(destination, payload):

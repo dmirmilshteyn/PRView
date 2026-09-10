@@ -16,11 +16,13 @@ import StackNavigator from "./stack/StackNavigator.jsx";
 import PRStatusBadge from "./stack/PRStatusBadge.jsx";
 import MergeReadiness from "./review/MergeReadiness.jsx";
 import TopReviewMenu from "./review/TopReviewMenu.jsx";
+import RepositoryControls from "./review/RepositoryControls.jsx";
 import { filterPullRequests } from "./dashboard-filters.js";
 import { hasMergeConflict } from "./stack/stack.js";
 import { getPullRequestStack, nextStackPullRequest } from "./stack/stack.js";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { parseRepositoryRoute, repositoryUrl, pullsUrl, pullUrl } from "./routes.js";
 
 const categories = [
   { key: "yourChanges", label: "Your changes", accent: "purple" },
@@ -44,18 +46,20 @@ function getCategoryItems(pullRequests, category) {
   return [];
 }
 
-function Layout({ pullRequests, prDetails, prDiffs, revisions, stackPRs }) {
+function Layout({ pullRequests, prDetails, prDiffs, revisions, stackPRs, workspace }) {
   const pathname = usePathname();
-  const isPullRequestsPage = pathname === "/pull-requests";
-  const isDetailPage = pathname.startsWith("/pull-requests/");
+  const route = parseRepositoryRoute(pathname.split("/").filter(Boolean));
+  const isPullRequestsPage = route?.page === "pulls";
+  const isDetailPage = route?.page === "pull";
 
   return (
     <div className="app-shell">
       <nav className="main-nav" aria-label="Main navigation">
-        <Link className={pathname === "/" ? "active" : ""} href="/">
+        <RepositoryControls workspace={workspace} showTrack={!isDetailPage} />
+        <Link className={!isPullRequestsPage && !isDetailPage ? "active" : ""} href={workspace.activeRepository ? repositoryUrl(workspace.activeRepository) : "/"}>
           Dashboard
         </Link>
-        <Link className={isPullRequestsPage || isDetailPage ? "active" : ""} href="/pull-requests">
+        <Link className={isPullRequestsPage || isDetailPage ? "active" : ""} href={workspace.activeRepository ? pullsUrl(workspace.activeRepository) : "/"}>
           Pull requests
         </Link>
       </nav>
@@ -77,7 +81,7 @@ function Layout({ pullRequests, prDetails, prDiffs, revisions, stackPRs }) {
 function PullRequestCard({ pullRequest }) {
   return (
     <div className="pr-card-wrapper">
-    <Link className="pr-card" href={`/pull-requests/${pullRequest.number}`}>
+    <Link className="pr-card" href={pullUrl(pullRequest.repository, pullRequest.number)}>
       <div className="pr-card-header">
         <h3><span className="pr-number">#{pullRequest.number}</span>{" "}{pullRequest.title}</h3>
       </div>
@@ -169,7 +173,8 @@ function PullRequests({ pullRequests }) {
 function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackPRs }) {
   const pathname = usePathname();
   const pathSegments = pathname.split("/").filter(Boolean);
-  const number = pathSegments[1];
+  const route = parseRepositoryRoute(pathSegments);
+  const number = route?.number;
   const pullRequest = categories
     .flatMap((category) => getCategoryItems(pullRequests, category))
     .find((item) => String(item.number) === number);
@@ -201,7 +206,7 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
       <div className="empty-page">
         <p className="eyebrow">Not found</p>
         <h1>Pull request not found</h1>
-        <Link className="back-link" href="/pull-requests">
+        <Link className="back-link" href={pullsUrl(route.repository)}>
           ← Back to pull requests
         </Link>
       </div>
@@ -213,7 +218,7 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
     <ReviewChat key={`${details.repository}:${number}`} repository={details.repository} number={details.number} details={details} onThreadUpdated={onThreadUpdated}>
     <article className="pr-detail" id="top">
       <div className="detail-kicker">
-        <Link className="back-link pr-header-back" href="/pull-requests" aria-label={`Pull request #${pullRequest.number} — back to pull requests`}>
+        <Link className="back-link pr-header-back" href={pullsUrl(details.repository)} aria-label={`Pull request #${pullRequest.number} — back to pull requests`}>
           <span aria-hidden="true">←</span>
           <span className="eyebrow">Pull request #{pullRequest.number}</span>
         </Link>
@@ -314,6 +319,6 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
   );
 }
 
-export default function App({ pullRequests, prDetails, prDiffs, revisions, stackPRs }) {
-  return <Layout pullRequests={pullRequests} prDetails={prDetails} prDiffs={prDiffs} revisions={revisions} stackPRs={stackPRs} />;
+export default function App({ pullRequests, prDetails, prDiffs, revisions, stackPRs, workspace }) {
+  return <Layout pullRequests={pullRequests} prDetails={prDetails} prDiffs={prDiffs} revisions={revisions} stackPRs={stackPRs} workspace={workspace} />;
 }

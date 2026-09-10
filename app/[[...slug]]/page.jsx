@@ -2,7 +2,10 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import App from "../../src/App.jsx";
+import { notFound, redirect } from "next/navigation";
+import { parseRepositoryRoute, repositoryUrl, pullsUrl, pullUrl } from "../../src/routes.js";
 import { readReview } from "../../lib/review-store.js";
+import { readWorkspace, repositoryArtifacts } from "../../lib/repositories.js";
 import { hasMergeConflict, hasPullRequestApproval, pullRequestCI, stackReviewProgress } from "../../src/stack/stack.js";
 
 function readJson(filePath, fallback) {
@@ -15,8 +18,8 @@ function readJson(filePath, fallback) {
 
 export const dynamic = "force-dynamic";
 
-async function loadReviewData(number) {
-  const artifactsPath = path.join(process.cwd(), "artifacts");
+async function loadReviewData(number, repository) {
+  const artifactsPath = repository ? repositoryArtifacts(process.cwd(), repository) : path.join(process.cwd(), "artifacts");
   const prs = readJson(path.join(artifactsPath, "prs.json"), {
     yourChanges: [],
     needsYourReview: [],
@@ -37,6 +40,7 @@ async function loadReviewData(number) {
       return null;
     }
     pr.additions = details.additions;
+    pr.repository = details.repository;
     pr.deletions = details.deletions;
     pr.author = details.author;
     pr.labels = details.labels ?? [];
@@ -59,7 +63,7 @@ async function loadReviewData(number) {
         }
         details.revision ??= details.headSha ?? createHash("sha256").update(JSON.stringify(diff)).digest("hex");
         if (/^[\w.-]+\/[\w.-]+$/.test(details.repository) && !details.repository.split("/").some((part) => part === "." || part === "..")) {
-          const historyPath = path.join(artifactsPath, "history", details.repository, number);
+          const historyPath = path.join(process.cwd(), "artifacts", "history", details.repository, number);
           try {
             for (const filename of readdirSync(historyPath)) {
               const snapshot = readJson(path.join(historyPath, filename), null);
@@ -83,7 +87,27 @@ async function loadReviewData(number) {
 
 export default async function Page({ params }) {
   const { slug } = await params;
-  const { prs, prDetails, prDiffs, revisions, stackPRs } = await loadReviewData(slug?.[1]);
+  const workspace = readWorkspace(process.cwd());
+  const segments = slug ?? [];
+  if (!segments.length && workspace.activeRepository) {
+    redirect(repositoryUrl(workspace.activeRepository));
+  }
+  if (segments[0] === "pull-requests" && workspace.activeRepository && (segments.length === 1 || (segments.length === 2 && /^[1-9]\d*$/.test(segments[1])))) {
+    redirect(segments[1] ? pullUrl(workspace.activeRepository, segments[1]) : pullsUrl(workspace.activeRepository));
+  }
+  const route = parseRepositoryRoute(segments);
+  if (segments.length && !route) {
+    notFound();
+  }
+  if (route) {
+    const repository = workspace.repositories.find((item) => item.toLowerCase() === route.repository.toLowerCase());
+    if (!repository) {
+      notFound();
+    }
+    // A saved URL identifies its repository independently of the last switcher selection.
+    workspace.activeRepository = repository;
+  }
+  const { prs, prDetails, prDiffs, revisions, stackPRs } = await loadReviewData(route?.number, workspace.activeRepository);
 
-  return <App pullRequests={prs} prDetails={prDetails} prDiffs={prDiffs} revisions={revisions} stackPRs={stackPRs} />;
+  return <App key={workspace.activeRepository ?? "empty"} workspace={workspace} pullRequests={prs} prDetails={prDetails} prDiffs={prDiffs} revisions={revisions} stackPRs={stackPRs} />;
 }

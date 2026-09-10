@@ -31,7 +31,7 @@
 .review-chat-header strong { font-size: 0.95rem; }
 .review-chat-header span { color: #a5b2c9; font-size: 0.72rem; }
 .pr-sidebar-tabs { display: flex; gap: 0.35rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid #344156; }
-.pr-sidebar-tabs button { flex: 1; padding: 0.4rem; background: transparent; border-color: transparent; }
+.pr-sidebar-tabs button { display: inline-flex; align-items: center; justify-content: center; flex: 1; min-height: 34px; padding: 0.4rem; background: transparent; border-color: transparent; }
 .pr-sidebar-tabs button[aria-pressed="true"] { color: #b5ebd7; background: #233d39; border-color: #426758; }
 .pr-sidebar-tabs span { margin-left: 0.3rem; font-variant-numeric: tabular-nums; }
 .pr-sidebar-chat { display: flex; flex-direction: column; min-height: 0; flex: 1; }

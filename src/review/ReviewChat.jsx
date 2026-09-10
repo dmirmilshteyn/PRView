@@ -253,14 +253,19 @@ export default function ReviewChat({ repository, number, children, details, onTh
         </div>
       </header>
       <div className="pr-sidebar-tabs" aria-label="PR sidebar panels">
-        <button type="button" aria-pressed={panel === "chat"} onClick={() => setPanel("chat")}>Chat</button>
-        <button type="button" aria-pressed={panel === "threads"} onClick={() => setPanel("threads")}>Threads <span>{unresolvedThreads(details).length}</span></button>
+        <button type="button" title="Chat" aria-label="Chat" aria-pressed={panel === "chat"} onClick={() => setPanel("chat")}>
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-8l-6 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" /><path d="M7 9h10M7 13h6" /></svg>
+        </button>
+        <button type="button" title="Unresolved threads" aria-label={`Unresolved threads (${unresolvedThreads(details).length})`} aria-pressed={panel === "threads"} onClick={() => setPanel("threads")}>
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="5" r="2" /><circle cx="5" cy="19" r="2" /><circle cx="18" cy="12" r="2" /><path d="M5 7v10M5 9a3 3 0 0 0 3 3h8" /></svg>
+          <span aria-hidden="true">{unresolvedThreads(details).length}</span>
+        </button>
       </div>
       {panel === "threads" && <UnresolvedThreads details={details} onUpdated={onThreadUpdated} />}
       <div className="pr-sidebar-chat" hidden={panel !== "chat"}>
       <div className="chat-messages" ref={messagesRef} onScroll={(event) => { const element = event.currentTarget; follow.current = element.scrollHeight - element.scrollTop - element.clientHeight < 70; }}>
         {!chat && !error && <p className="review-muted">Loading conversation…</p>}
-        {chat?.messages.length === 0 && <div className="chat-empty"><strong>A second look at this PR</strong><p>Ask about bugs, tradeoffs, missing tests, or anything in the diff.</p></div>}
+        {chat?.messages.length === 0 && <div className="chat-empty"><p>Ask about bugs, tradeoffs, missing tests, or anything in the diff.</p></div>}
         {chat?.messages.map((message) => <div className={`chat-message ${message.role}`} key={message.id}><div className="thread-message-meta"><strong>{message.role === "user" ? "You" : "Luna"}</strong><CommentTime value={message.createdAt} /></div><ChatAttachments attachments={message.attachments} onRemove={null} /><Markdown>{message.text}</Markdown></div>)}
         {chat?.status === "running" && <p className="chat-activity" role="status">{chat.activity || "Luna is responding…"}</p>}
         {chat?.error && <p className="chat-error" role="alert">{chat.error}</p>}

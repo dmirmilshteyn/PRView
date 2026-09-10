@@ -15,6 +15,5 @@ export default function HotkeyHelp({ onClose }) {
       <div><dt><kbd>Shift</kbd> + <kbd>Enter</kbd></dt><dd>New line in chat</dd></div>
       <div><dt><kbd>Esc ⎋</kbd></dt><dd>Close a dialog before submission</dd></div>
     </dl>
-    <p className="review-muted">Press two-key shortcuts in order within 750 ms, or hold both keys together. PR shortcuts are paused while typing or while a dialog is open.</p>
   </Modal>;
 }

@@ -207,9 +207,16 @@
 .review-markdown th, .review-markdown td { border: 1px solid #405063; padding: 0.4rem; }
 .review-markdown input[type=checkbox] { margin-right: 0.5rem; }
 .discussion-threads { display: grid; gap: 1rem; }
+.discussion-numbered { padding: 0; list-style: none; }
+.discussion-numbered > li { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 0.6rem; }
+.discussion-number { color: #91a2b3; font-size: 0.8rem; font-variant-numeric: tabular-nums; padding-top: 0.85rem; min-width: 2rem; }
 .github-thread-actions { padding: 0.5rem 0.75rem; border-top: 1px solid #2b3b49; }
 .github-thread-buttons { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
 .github-thread-actions button { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+.pr-context .discussion-comment-button { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.55rem 0.9rem; border: 1px solid #3c8667; border-radius: 7px; background: #22543e; color: #e3f7ed; font-size: 0.85rem; font-weight: 600; box-shadow: 0 1px 2px #0003; transition: background 150ms ease, border-color 150ms ease; }
+.pr-context .discussion-comment-button:hover:not(:disabled) { background: #2b684d; border-color: #66b992; }
+.pr-context .discussion-comment-button:focus-visible { outline: 2px solid #86dec0; outline-offset: 3px; }
+.pr-context .discussion-comment-button:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
 .github-thread-actions form { display: grid; justify-items: start; gap: 0.5rem; margin-top: 0.5rem; }
 .github-thread-actions textarea { width: 100%; min-height: 5rem; resize: vertical; padding: 0.6rem; background: #101923; color: #e1e7ef; border: 1px solid #3c5365; border-radius: 0.4rem; font: inherit; font-size: 0.8rem; }
 .github-thread-actions p { margin: 0.4rem 0 0; font-size: 0.75rem; }
@@ -483,7 +490,7 @@ h1 {
 .hotkey-list > div { display: grid; grid-template-columns: 130px 1fr; gap: 1rem; }
 .hotkey-list dd { margin: 0; }
 .hotkey-list kbd { padding: 0.15rem 0.35rem; border: 1px solid #405463; border-radius: 4px; }
-.hotkey-help-button { position: absolute; top: -2.5rem; right: 0; }
+.hotkey-help-button { justify-content: center; min-width: 1.75rem; }
 .pr-detail { position: relative; }
 .review-preview-comment { margin: 0.75rem 0; padding: 0.85rem; border: 1px solid #344456; border-radius: 6px; overflow-wrap: anywhere; }
 .live-pr-status, .stack-review-navigation { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin: 0.85rem 0; color: #a6b8c8; font-size: 0.85rem; }
@@ -635,9 +642,26 @@ h1 {
   box-shadow: 0 4px 18px #0002;
   min-width: 0;
 }
-.pr-info-card > .pr-context { background: none; border: 0; border-radius: 0; padding: 0; margin-bottom: 1.25rem; }
-.pr-info-card > .detail-grid { border-top: 1px solid #22303d; }
-.pr-info-card > .metadata-list { margin-top: 0; }
+.pr-info-card.pr-page-section { margin-top: 1rem; }
+.pr-info-card > .pr-context { background: none; border: 0; border-radius: 0; padding: 0; margin: 0; }
+.pr-info-overview { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+.pr-info-description, .pr-info-metadata { min-width: 0; }
+.pr-info-description { overflow-wrap: anywhere; }
+.pr-info-metadata { border-left: 1px solid #2a3a49; padding-left: 1.5rem; }
+.pr-info-metadata .detail-grid { margin: 0; padding: 0 0 0.75rem; gap: 0.75rem 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pr-info-metadata .detail-stat strong { overflow-wrap: anywhere; }
+.pr-info-metadata .metadata-list { margin: 0; padding-top: 0.75rem; grid-template-columns: minmax(0, 1fr); gap: 0.5rem; }
+.pr-info-metadata .metadata-list > div { grid-template-columns: 7rem minmax(0, 1fr); align-items: baseline; gap: 0.75rem; }
+.pr-info-controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; border-top: 1px solid #2a3a49; border-bottom: 1px solid #2a3a49; padding: 1rem 0; margin-top: 1.25rem; }
+.pr-info-controls > div { min-width: 0; overflow-wrap: anywhere; }
+.pr-info-controls > div > h2 { margin: 0 0 0.65rem; }
+.pr-info-controls p, .pr-info-controls .check-list { margin: 0.5rem 0 0; }
+.pr-info-controls .review-options { margin: 0; }
+@media (max-width: 1000px) {
+  .pr-info-overview, .pr-info-controls { grid-template-columns: minmax(0, 1fr); }
+  .pr-info-metadata { border-left: 0; border-top: 1px solid #2a3a49; padding: 1rem 0 0; }
+  .pr-info-metadata .metadata-list { grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 0.5rem 1.5rem; }
+}
 .pr-section-heading { font-size: 1.1rem; font-weight: 600; color: #c3d2df; border-bottom: 1px solid #2a3a49; padding-bottom: 0.8rem; margin: 0 0 1.25rem; }
 .code-tour-tabs { display: flex; gap: 1.5rem; border-bottom: 1px solid #2a3a49; margin-bottom: 1.25rem; }
 .code-tour-tabs button { border: 0; border-bottom: 2px solid transparent; background: transparent; color: #9aabba; font: inherit; font-size: 1.1rem; font-weight: 600; padding: 0 0 0.8rem; cursor: pointer; }

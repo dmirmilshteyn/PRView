@@ -198,7 +198,6 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
     <ReviewProvider key={`${details.repository}:${number}`} repository={details.repository} number={details.number} nextPR={nextStackPullRequest(getPullRequestStack(details, stackPRs), number)}>
     <ReviewChat key={`${details.repository}:${number}`} repository={details.repository} number={details.number}>
     <article className="pr-detail" id="top">
-      <PRHotkeys key={`${details.repository}:${number}`} link={details.link} repository={details.repository} number={details.number} onAssigned={(result) => setAssignment({ source: prDetails[number], assignees: result.assignees, until: Date.now() + 60000 })} onReviewerRequested={(result) => setRequestedReviewers({ source: prDetails[number], reviewRequests: result.reviewRequests, until: Date.now() + 60000 })} />
       <div className="detail-kicker">
         <Link className="back-link" href="/pull-requests" aria-label="Back to pull requests">
           ←
@@ -207,6 +206,7 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
         <div className="detail-actions">
           <PinButton number={pullRequest.number} />
           <RefreshButton repository={details.repository} number={details.number} />
+          <PRHotkeys key={`${details.repository}:${number}`} link={details.link} repository={details.repository} number={details.number} onAssigned={(result) => setAssignment({ source: prDetails[number], assignees: result.assignees, until: Date.now() + 60000 })} onReviewerRequested={(result) => setRequestedReviewers({ source: prDetails[number], reviewRequests: result.reviewRequests, until: Date.now() + 60000 })} />
         </div>
       </div>
       <h1>{details.title}</h1>
@@ -223,13 +223,15 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
         <section className="pr-page-section pr-info-card" id="info" aria-labelledby="info-heading">
           <h2 className="pr-section-heading" id="info-heading">Info</h2>
           <PullRequestContext details={details} onThreadUpdated={(result) => setDiscussion((previous) => {
-            const github = previous?.source === prDetails[number] ? previous.github : prDetails[number].github;
+            const github = (previous?.source === prDetails[number] ? previous.github : prDetails[number].github) ?? { comments: [], reviews: [], inlineComments: [], threads: [] };
             return { source: prDetails[number], github: {
               ...github,
+              comments: result.discussionComment ? [...(github.comments ?? []).filter((comment) => comment.id !== result.discussionComment.id), result.discussionComment] : github.comments,
               inlineComments: result.comment ? [...(github.inlineComments ?? []).filter((comment) => comment.id !== result.comment.id), result.comment] : github.inlineComments,
               threads: result.thread ? (github.threads ?? []).map((thread) => thread.id === result.thread.id ? { ...thread, ...result.thread } : thread) : github.threads,
             } };
-          })} />
+          })} >
+          <div className="pr-info-metadata">
           {ciError && <p className="pr-refresh-error" role="status">{ciError}</p>}
           <div className="detail-grid">
             <div className="detail-stat">
@@ -295,6 +297,8 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
               <dd>{details.filesChanged}</dd>
             </div>
           </dl>
+          </div>
+          </PullRequestContext>
         </section>
         <CodeTour key={`${details.repository}:${number}`} details={details} diff={diff ?? { files: [] }} revisions={revisions} />
     </article>

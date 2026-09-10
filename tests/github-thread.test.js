@@ -21,6 +21,29 @@ function node(resolved) {
   return { id: "thread", isResolved: resolved, viewerCanResolve: true, viewerCanUnresolve: true, pullRequest: { number: 23, repository: { nameWithOwner: "owner/repo" } } };
 }
 
+test("discussion comments post to the issue conversation and retries avoid duplicates", async () => {
+  const comments = [];
+  let posts = 0;
+  const service = await fixture(async (method, endpoint, payload) => {
+    if (endpoint === "user") {
+      return { login: "me" };
+    }
+    if (method === "GET") {
+      expect(endpoint).toBe("repos/owner/repo/issues/23/comments?per_page=100&page=1");
+      return comments;
+    }
+    expect(endpoint).toBe("repos/owner/repo/issues/23/comments");
+    posts += 1;
+    comments.push({ id: 99, body: payload.body, user: { login: "me" } });
+    throw new Error("Response lost");
+  });
+  const request = { ...input("comment"), commentId: null };
+  await expect(service.act({ ...request, body: " " })).rejects.toThrow("required");
+  await expect(service.act(request)).rejects.toThrow("Response lost");
+  expect((await service.act(request)).discussionComment.id).toBe(99);
+  expect(posts).toBe(1);
+});
+
 test("replies target the original inline thread and reconcile a lost response", async () => {
   const comments = [];
   let posts = 0;

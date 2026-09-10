@@ -48,6 +48,16 @@ export function makeHunks(file, context, ignoreWhitespace) {
   }));
 }
 
+export function hunksForReference(hunks, reference) {
+  return hunks.filter((hunk) => {
+    const match = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))?/.exec(hunk.header);
+    const old = reference.side === "LEFT";
+    const start = (old ? hunk.oldStart : hunk.newStart) ?? Number(match?.[old ? 1 : 3]);
+    const count = (old ? hunk.oldLines : hunk.newLines) ?? Number(match?.[old ? 2 : 4] ?? 1);
+    return count === 0 ? start >= reference.start - 1 && start <= reference.end : start <= reference.end && start + count - 1 >= reference.start;
+  });
+}
+
 export function comparisonFiles(current, baseline, baselineRevision) {
   const previous = new Map(baseline.files.map((file) => [file.path, file]));
   const present = new Map([...current.files, ...(current.comparisonFiles ?? [])].map((file) => [file.path, file]));

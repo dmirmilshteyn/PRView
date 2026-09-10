@@ -32,7 +32,7 @@ export default function CodeTour({ details, diff, revisions }) {
       <ReviewWorkspace details={details} diff={diff} revisions={revisions} active={tab === "code"} navigationTarget={target} />
     </div>
     <div id="tour-panel" role="tabpanel" aria-labelledby="tour-tab" hidden={tab !== "tour"}>
-      {visited && <ReviewTour key={`${details.revision}:${details.baseSha}:${details.diffBaseSha}`} details={details} fileCount={diff.files.length} active={tab === "tour"} onOpenCode={openCode} />}
+      {visited && <ReviewTour key={`${details.revision}:${details.baseSha}:${details.diffBaseSha}`} details={details} diff={diff} fileCount={diff.files.length} active={tab === "tour"} onOpenCode={openCode} />}
     </div>
   </section>;
 }

@@ -16,7 +16,7 @@ function input() {
   ] });
 }
 function tour() {
-  return { title: "Follow the empty-input path", overview: "Empty input now returns an array.", flow: "Input passes through src/parser.js.", steps: [{ title: "Guard behavior", risk: "medium", why: "Changes the return contract", explanation: "The fallback returns an empty array.", references: [{ path: "src/parser.js", side: "RIGHT", start: 1, end: 3 }], questions: ["Should false also become an array?"] }], mechanical: [], existingTests: [], suggestedTests: ["Pass false and check the expected contract"], notCovered: [], limitations: ["Tests were not supplied"] };
+  return { preparation: { summary: "The parser return contract changes for empty input.", areas: [{ title: "Caller expectations", context: "Callers previously received the original input.", whyItMatters: "An array fallback changes how callers interpret missing values." }] }, title: "Follow the empty-input path", overview: "Empty input now returns an array.", flow: "Input passes through src/parser.js.", steps: [{ title: "Guard behavior", risk: "medium", why: "Changes the return contract", explanation: "The fallback returns an empty array.", references: [{ path: "src/parser.js", side: "RIGHT", start: 1, end: 3 }], questions: ["Should false also become an array?"] }], mechanical: [], existingTests: [], suggestedTests: ["Pass false and check the expected contract"], notCovered: [], limitations: ["Tests were not supplied"] };
 }
 async function setup(runner) {
   const root = await mkdtemp(path.join(os.tmpdir(), "prview-tour-"));
@@ -48,6 +48,7 @@ test("tour identities track code and base changes while excluding CI and reviewe
   expect(tourFingerprint({ ...source, files: [] })).not.toBe(fingerprint);
   expect(tourFingerprint({ ...source, repository: "other/repo" })).not.toBe(fingerprint);
   expect(tourFingerprint({ ...source, number: 24 })).not.toBe(fingerprint);
+  expect(tourFingerprint({ ...source, version: 2 })).not.toBe(fingerprint);
   expect(tourPrompt(source, "/tmp/snapshot.json")).toContain("immutable source of truth");
 });
 
@@ -65,6 +66,17 @@ test("tour references are grounded in source and uncovered files remain explicit
   const patch = { hunks: [{ header: "@@ -7,2 +8,2 @@", lines: [" context", "-old", "+new"] }] };
   expect([...tourLines(patch, "LEFT")]).toEqual([[7, "context"], [8, "old"]]);
   expect([...tourLines(patch, "RIGHT")]).toEqual([[8, "context"], [9, "new"]]);
+});
+
+test("preparation guide is preserved and requires bounded, complete risk areas", () => {
+  const value = tour();
+  expect(validateTour(JSON.stringify(value), input()).preparation).toEqual(value.preparation);
+  value.preparation = { summary: "No material high-risk area is evident in this snapshot.", areas: [] };
+  expect(validateTour(JSON.stringify(value), input()).preparation.areas).toEqual([]);
+  for (const preparation of [undefined, { summary: "Summary", areas: Array(5).fill({}) }, { summary: "Summary", areas: [{ title: "Area" }] }]) {
+    expect(() => validateTour(JSON.stringify({ ...value, preparation }), input())).toThrow();
+  }
+  expect(tourFingerprint({ ...input(), version: 3 })).not.toBe(tourFingerprint(input()));
 });
 
 test("generation is deduplicated and completed tours survive service restarts", async () => {

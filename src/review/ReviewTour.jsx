@@ -3,6 +3,7 @@ import Markdown from "./Markdown.jsx";
 import CommentTime from "./CommentTime.jsx";
 import TourCode from "./TourCode.jsx";
 import { nextUnreviewedIndex, ignoresReviewShortcut } from "./review-navigation.js";
+import { useLocalReview } from "./ReviewProvider.jsx";
 
 function TourList({ items, empty }) {
   return items.length ? <ul>{items.map((item, index) => <li key={index}><Markdown>{item}</Markdown></li>)}</ul> : <p className="review-muted">{empty}</p>;
@@ -15,24 +16,26 @@ function TourReviewed({ section, title, reviewed, pending, onChange }) {
   </label>;
 }
 
-function TourStop({ stop, onOpenCode, revision }) {
+function TourStop({ stop, onOpenCode, revision, files }) {
   return <>
-          <div className={`tour-callout ${stop.risk}`}><h4>Why this matters · {stop.risk} focus</h4><Markdown>{stop.why}</Markdown></div>
           <Markdown>{stop.explanation}</Markdown>
+          <div className={`tour-callout ${stop.risk}`}><h4>Why this matters · {stop.risk} focus</h4><Markdown>{stop.why}</Markdown></div>
           {stop.references.map((reference, index) => <div className="tour-code" key={index}>
-            <header><span>{reference.path} · {reference.side === "LEFT" ? "Before" : "After"} · L{reference.start}{reference.end !== reference.start ? `–${reference.end}` : ""}</span><button type="button" onClick={() => onOpenCode(reference)}>Open in Code</button></header>
-            <TourCode reference={reference} revision={revision} />
+            <header><span>{reference.path} · Diff around {reference.side === "LEFT" ? "old" : "new"} L{reference.start}{reference.end !== reference.start ? `–${reference.end}` : ""}</span><button type="button" onClick={() => onOpenCode(reference)}>Open in Code</button></header>
+            <TourCode reference={reference} revision={revision} file={files.find((file) => file.path === reference.path)} onOpenCode={onOpenCode} />
           </div>)}
-          <div className="tour-questions"><h4>Review checkpoints</h4><TourList items={stop.questions} empty="" /></div>
+          <div className="tour-questions"><h4>Things to look for</h4><TourList items={stop.questions} empty="" /></div>
   </>;
 }
 
-export default function ReviewTour({ details, fileCount, active, onOpenCode }) {
+export default function ReviewTour({ details, diff, fileCount, active, onOpenCode }) {
+  const review = useLocalReview();
   const [state, setState] = useState(null);
   const [error, setError] = useState(null);
   const [attempt, setAttempt] = useState(0);
   const [selected, setSelected] = useState(0);
   const [saving, setSaving] = useState(new Set());
+  const navigation = useRef(null);
   const [saveError, setSaveError] = useState(null);
   const pendingSections = useRef(new Set());
   const loadVersion = useRef(0);
@@ -109,7 +112,10 @@ export default function ReviewTour({ details, fileCount, active, onOpenCode }) {
       const sidebarRect = sidebar.current.getBoundingClientRect();
       const contentRect = content.current.getBoundingClientRect();
       const stacked = Math.abs(sidebarRect.left - contentRect.left) < 2;
-      const readingLine = stacked ? Math.max(100, sidebarRect.bottom + 24) : 100;
+      const navigationRect = navigation.current?.getBoundingClientRect();
+      const navigationBottom = navigationRect && navigationRect.top <= 1 ? navigationRect.bottom : 0;
+      const sidebarPinned = stacked && sidebarRect.top <= navigationBottom + 1;
+      const readingLine = Math.max(navigationBottom + 24, sidebarPinned ? sidebarRect.bottom + 24 : 100);
       let index = 0;
       for (let candidate = 0; candidate < elements.length; candidate += 1) {
         if (elements[candidate]?.getBoundingClientRect().top <= readingLine + 1) {
@@ -133,16 +139,26 @@ export default function ReviewTour({ details, fileCount, active, onOpenCode }) {
       }
     }
     frame = requestAnimationFrame(() => {
-      sectionElements.current[currentSection.current]?.scrollIntoView({ block: "start" });
+      if (currentSection.current > 0) {
+        sectionElements.current[currentSection.current]?.scrollIntoView({ block: "start" });
+      }
       trackSection();
     });
     window.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
     const observer = new ResizeObserver(schedule);
     observer.observe(content.current);
+    const navigationObserver = new ResizeObserver(() => {
+      navigation.current?.closest(".tour-workspace")?.style.setProperty("--tour-navigation-height", `${navigation.current.getBoundingClientRect().height}px`);
+      schedule();
+    });
+    if (navigation.current) {
+      navigationObserver.observe(navigation.current);
+    }
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
+      navigationObserver.disconnect();
       window.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
     };
@@ -272,43 +288,65 @@ export default function ReviewTour({ details, fileCount, active, onOpenCode }) {
   const sectionKeys = ["overview", ...tour.steps.map((step) => `step-${step.id}`), ...(mechanical.length ? ["mechanical"] : []), "tests"];
   const reviewedSections = state.reviewedSections ?? {};
   const reviewedCount = sectionKeys.filter((key) => reviewedSections[key]).length;
+  const nextUnreviewed = nextUnreviewedIndex(sectionKeys, selected, new Set(sectionKeys.filter((key) => reviewedSections[key])));
   function reviewedControl(index) {
     const section = sectionKeys[index];
-    return <footer className="tour-section-footer"><TourReviewed section={section} title={sections[index]} reviewed={Boolean(reviewedSections[section])} pending={saving.has(section)} onChange={(key, value) => markReviewed(key, value, false)} /><button type="button" disabled={saving.has(section)} title="Mark reviewed and advance (M)" onClick={() => markReviewed(section, true, true)}>Reviewed & next <kbd>M</kbd></button></footer>;
+    return <>
+      <TourReviewed section={section} title={sections[index]} reviewed={Boolean(reviewedSections[section])} pending={saving.has(section)} onChange={(key, value) => markReviewed(key, value, false)} />
+      <button type="button" disabled={saving.has(section)} aria-keyshortcuts="M" title="Mark reviewed and advance (M)" onClick={() => markReviewed(section, true, true)}>
+        Reviewed & next <kbd>M</kbd>
+      </button>
+    </>;
   }
   function reviewedIndicator(index) {
     return reviewedSections[sectionKeys[index]] ? <span className="tour-reviewed-indicator">✓ Reviewed</span> : null;
   }
   return <section className="review-workspace tour-workspace" aria-label="PR review tour">
     <div className="tour-meta"><span>Luna · snapshot {state.revision?.slice(0, 8)}</span><span>Generated <CommentTime value={state.generatedAt} /></span><span>{tour.coveredCount}/{tour.fileCount} files in the route · {tour.steps.length} review stops{mechanical.length ? ` · ${mechanical.length} mechanical groups` : ""}</span></div>
+    <div className="tour-content tour-overview">
+      <details open={!reviewedSections[sectionKeys[0]]} className="tour-section" id="tour-section-0" aria-labelledby="tour-heading-0" ref={(element) => { sectionElements.current[0] = element; }}>
+        <summary className="tour-section-heading"><p className="eyebrow">Change overview · Before & after</p><h3 id="tour-heading-0" tabIndex={-1}>{tour.title}</h3>{reviewedIndicator(0)}</summary>
+        <Markdown>{tour.overview}</Markdown>
+        <div className="tour-callout"><h4>Follow the change</h4><Markdown>{tour.flow}</Markdown></div>
+      </details>
+    </div>
+    {tour.preparation && <section className="tour-preparation" aria-label="Before you start">
+      <p className="eyebrow">Before you start</p>
+      <h3>What to keep in mind</h3>
+      <Markdown>{tour.preparation.summary}</Markdown>
+      {tour.preparation.areas.length > 0 && <div className="tour-preparation-areas">{tour.preparation.areas.map((area, index) => <article key={index}>
+        <h4>{area.title}</h4>
+        <Markdown>{area.context}</Markdown>
+        <div className="tour-preparation-impact"><strong>Why it matters</strong><Markdown>{area.whyItMatters}</Markdown></div>
+      </article>)}</div>}
+    </section>}
     <div className="tour-review-progress"><strong>{reviewedCount} / {sections.length} sections reviewed</strong><span role="status">{saving.size ? "Saving…" : saveError ? "Not saved" : "Saved"}</span></div>
     {saveError && <p className="tour-save-error" role="alert">{saveError}</p>}
+    <div className="review-options"><label><input type="checkbox" checked={review.state.preferences.split ?? false} disabled={!review.ready} onChange={(event) => review.update({ type: "preferences", preferences: { split: event.target.checked } })} /> Split view</label></div>
+    <nav className="code-review-navigation tour-review-navigation" aria-label="Tour review navigation" ref={navigation}>
+      <div className="context-heading"><strong>{sections[selected]}</strong><span>Section {selected + 1} of {sections.length}</span></div>
+      <button type="button" disabled={selected === 0} onClick={() => navigate(selected - 1)}>Previous</button>
+      <button type="button" disabled={nextUnreviewed === null} onClick={() => navigate(nextUnreviewed)}>Next unreviewed</button>
+      {reviewedControl(selected)}
+      <button type="button" disabled={selected === sections.length - 1} onClick={() => navigate(selected + 1)}>Next</button>
+    </nav>
     <div className="review-layout">
       <aside className="review-sidebar tour-sidebar" aria-label="Tour sections" ref={sidebar}>
-        <strong>Review route</strong>
+        <strong>Changes by area</strong>
         {sections.map((title, index) => <button key={index} type="button" className={selected === index ? "active" : ""} aria-current={selected === index ? "location" : undefined} aria-controls={`tour-section-${index}`} onClick={() => navigate(index)}>
           <span className={`tour-stop-number ${reviewedSections[sectionKeys[index]] ? "is-reviewed" : ""}`}><span aria-label={reviewedSections[sectionKeys[index]] ? "Reviewed" : undefined}>{reviewedSections[sectionKeys[index]] ? "✓" : index === 0 ? "◉" : index === sections.length - 1 ? "◎" : index === mechanicalIndex ? "◇" : index}</span></span>
-          <span>{title}{tour.steps[index - 1] && <small className={`tour-risk ${tour.steps[index - 1].risk}`}>{tour.steps[index - 1].risk} focus</small>}</span>
+          <span>{title}</span>
         </button>)}
       </aside>
       <div className="tour-content" ref={content}>
-        <details open={!reviewedSections[sectionKeys[0]]} className="tour-section" id="tour-section-0" aria-labelledby="tour-heading-0" ref={(element) => { sectionElements.current[0] = element; }}>
-          <summary className="tour-section-heading"><p className="eyebrow">The review plan</p><h3 id="tour-heading-0" tabIndex={-1}>{tour.title}</h3>{reviewedIndicator(0)}</summary>
-          <Markdown>{tour.overview}</Markdown>
-          <div className="tour-callout"><h4>Follow the change</h4><Markdown>{tour.flow}</Markdown></div>
-          <p className="review-muted">Follow the route in order or jump to a section. These are review checkpoints, not verified findings.</p>
-          {reviewedControl(0)}
-        </details>
         {tour.steps.map((stop, stopIndex) => <details open={!reviewedSections[sectionKeys[stopIndex + 1]]} className="tour-section" id={`tour-section-${stopIndex + 1}`} aria-labelledby={`tour-heading-${stopIndex + 1}`} key={stop.id} ref={(element) => { sectionElements.current[stopIndex + 1] = element; }}>
           <summary className="tour-section-heading"><p className="eyebrow">Stop {stopIndex + 1} of {tour.steps.length}</p><h3 id={`tour-heading-${stopIndex + 1}`} tabIndex={-1}>{sections[stopIndex + 1]}</h3>{reviewedIndicator(stopIndex + 1)}</summary>
-          <TourStop stop={stop} onOpenCode={onOpenCode} revision={details.revision} />
-          {reviewedControl(stopIndex + 1)}
+          <TourStop stop={stop} onOpenCode={onOpenCode} revision={details.revision} files={diff.files} />
         </details>)}
         {mechanical.length > 0 && <details className="tour-section tour-mechanical" id={`tour-section-${mechanicalIndex}`} aria-labelledby="tour-mechanical-heading" ref={(element) => { sectionElements.current[mechanicalIndex] = element; }}>
           <summary className="tour-section-heading"><p className="eyebrow">Supporting work · {mechanical.length} groups</p><h3 id="tour-mechanical-heading">Mechanical changes</h3>{reviewedIndicator(mechanicalIndex)}</summary>
           <p className="review-muted">Prop plumbing, repetitive wiring, and other behavior-preserving edits. Expand the code references for a quick consistency review.</p>
-          {mechanical.map((stop) => <div className="tour-mechanical-group" key={stop.id}><h4>{stop.title.replace(/^\d+[.)]\s*/, "")}</h4><TourStop stop={stop} onOpenCode={onOpenCode} revision={details.revision} /></div>)}
-          {reviewedControl(mechanicalIndex)}
+          {mechanical.map((stop) => <div className="tour-mechanical-group" key={stop.id}><h4>{stop.title.replace(/^\d+[.)]\s*/, "")}</h4><TourStop stop={stop} onOpenCode={onOpenCode} revision={details.revision} files={diff.files} /></div>)}
         </details>}
         <details open={!reviewedSections[sectionKeys[sections.length - 1]]} className="tour-section" id={`tour-section-${sections.length - 1}`} aria-labelledby="tour-tests-heading" ref={(element) => { sectionElements.current[sections.length - 1] = element; }}>
           <summary className="tour-section-heading"><p className="eyebrow">Before you finish</p><h3 id="tour-tests-heading" tabIndex={-1}>Tests & coverage</h3>{reviewedIndicator(sections.length - 1)}</summary>
@@ -316,7 +354,6 @@ export default function ReviewTour({ details, fileCount, active, onOpenCode }) {
           <h4>What to verify</h4><TourList items={tour.suggestedTests} empty="No additional test scenarios were suggested." />
           <h4>Outside the guided route</h4>{tour.notCovered.length ? <ul>{tour.notCovered.map((file) => <li key={file.path}><strong>{file.path}</strong><Markdown>{file.reason}</Markdown></li>)}</ul> : <p>Every changed file is referenced by a tour stop.</p>}
           <h4>Evidence & limitations</h4><TourList items={tour.limitations} empty="Luna reported no additional limitations." /><p className="review-muted">This tour explains the supplied snapshot. It does not run tests or mark files reviewed.</p>
-          {reviewedControl(sections.length - 1)}
         </details>
       </div>
     </div>

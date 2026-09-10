@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { highlightCode } from "./syntax.js";
-import { makeHunks, numberedLines, splitRows } from "./diff.js";
+import { makeHunks, numberedLines, splitRows, hunksForReference } from "./diff.js";
 import NoteThreads from "./NoteThreads.jsx";
 import { placeComments } from "./comment-placement.js";
 
@@ -25,7 +25,7 @@ function useTokens(file) {
   return tokens;
 }
 
-export default function DiffFile({ file, split, ignoreWhitespace, selection, onSelect, anchorRevision, leftRevision, view, onView, notes, draft, onDraft, onUpdate, onCancel, onJump }) {
+export default function DiffFile({ file, split, ignoreWhitespace, selection, onSelect, anchorRevision, leftRevision, view, onView, notes, draft, onDraft, onUpdate, onCancel, onJump, focusRange }) {
   const { context, full, fullSide } = view;
   const tokens = useTokens(file);
   const rootRef = useRef(null);
@@ -34,7 +34,10 @@ export default function DiffFile({ file, split, ignoreWhitespace, selection, onS
   const rangeOrigin = useRef(null);
   const [dragSelection, setDragSelection] = useState(null);
   const available = typeof file.baseContent?.text === "string" && typeof file.headContent?.text === "string";
-  const hunks = useMemo(() => makeHunks(file, context, ignoreWhitespace), [file, context, ignoreWhitespace]);
+  const hunks = useMemo(() => {
+    const all = makeHunks(file, context, ignoreWhitespace);
+    return focusRange ? hunksForReference(all, focusRange) : all;
+  }, [file, context, ignoreWhitespace, focusRange]);
   const fullLines = full && available ? (fullSide === "LEFT" ? file.baseContent.text : file.headContent.text).split("\n") : null;
   const visibleLines = new Set();
   if (fullLines) {
@@ -172,7 +175,7 @@ export default function DiffFile({ file, split, ignoreWhitespace, selection, onS
           {lineButton("LEFT", row.oldLine, row.text)}{lineButton("RIGHT", row.newLine, row.text)}<span className="line-marker">{row.marker}</span>{source(row, row.marker === "-" ? "LEFT" : "RIGHT")}
         </div>{inlineComments(row.oldLine, row.newLine)}</Fragment>)}
       </div>;
-    }) : <p className="review-muted">{file.comparisonUnavailable ? "No comparison available." : ignoreWhitespace ? "No changes after ignoring leading and trailing whitespace." : "No textual changes."}</p>}
+    }) : <div><p className="review-muted">{file.comparisonUnavailable ? "No comparison available." : focusRange ? "No diff hunk overlaps this reference. Expand context or view the full file; the cited source is shown below." : ignoreWhitespace ? "No changes after ignoring leading and trailing whitespace." : "No textual changes."}</p>{focusRange && <pre className="tour-reference-context"><code>{focusRange.excerpt}</code></pre>}</div>}
     {(placement.remaining.length > 0 || (draft.open && !placement.draftLine)) && <div className="comments-outside-diff">
       {(placement.remaining.some((note) => note.anchor) || (draft.open && draft.anchor && !placement.draftLine)) && <p className="review-muted">Comments outside the displayed lines. Expand context or view the original snapshot to see their code.</p>}
       <NoteThreads filePath={file.path} revision={anchorRevision} notes={placement.remaining} draft={draft} onDraft={onDraft} onUpdate={onUpdate} onCancel={onCancel} onJump={onJump} showComposer={!placement.draftLine} inline={false} />

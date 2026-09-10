@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocalReview } from "./ReviewProvider.jsx";
 import FinalReview from "./FinalReview.jsx";
 import { draftKey } from "./state.js";
-import { comparisonFiles } from "./diff.js";
+import { changesSinceReview, lastSubmittedReview } from "./review-changes.js";
 import DiffFile from "./DiffFile.jsx";
 import NoteThreads, { newDraft } from "./NoteThreads.jsx";
 import Markdown from "./Markdown.jsx";
@@ -15,6 +15,7 @@ export default function ReviewWorkspace({ details, diff, revisions, active, navi
   const [selection, setSelection] = useState({});
   const [restored, setRestored] = useState(false);
   const [jumpTarget, setJumpTarget] = useState(null);
+  const [chosenBaseline, setChosenBaseline] = useState(null);
   const fileElements = useRef(new Map());
   const positionRef = useRef(null);
   const updateRef = useRef(update);
@@ -22,9 +23,13 @@ export default function ReviewWorkspace({ details, diff, revisions, active, navi
   updateRef.current = update;
   const snapshot = revisions[viewedRevision] ?? { details, diff };
   const revision = snapshot.details.revision;
-  const baseline = revisions[state.baselineRevision];
+  const lastReview = lastSubmittedReview(state.reviews ?? []);
+  const baselineRevision = chosenBaseline ?? lastReview?.revision ?? state.baselineRevision;
+  const baseline = revisions[baselineRevision];
   const sinceReview = Boolean(state.preferences.sinceReview && baseline);
-  const files = useMemo(() => sinceReview ? comparisonFiles(snapshot.diff, baseline.diff, state.baselineRevision) : snapshot.diff.files, [sinceReview, snapshot.diff, baseline, state.baselineRevision]);
+  const changes = useMemo(() => changesSinceReview(snapshot, baseline, baselineRevision), [snapshot, baseline, baselineRevision]);
+  const changedPaths = new Set(changes?.files.map((file) => file.path) ?? []);
+  const files = sinceReview ? changes.files : snapshot.diff.files;
   const visibleFiles = files.filter((file) => file.path.toLowerCase().includes(query.toLowerCase()));
   const isReviewed = (file) => state.reviewed[file.path]?.fingerprint === file.fingerprint;
   const reviewedCount = snapshot.diff.files.filter(isReviewed).length;
@@ -123,6 +128,12 @@ export default function ReviewWorkspace({ details, diff, revisions, active, navi
     setSelection({});
   }
 
+  function chooseBaseline(value) {
+    setChosenBaseline(value);
+    update({ type: "baseline", revision: value });
+    setSelection({});
+  }
+
   function jumpToNote(note) {
     const target = note.anchor?.revision ?? note.revision;
     const historical = revisions[target];
@@ -173,24 +184,37 @@ export default function ReviewWorkspace({ details, diff, revisions, active, navi
         <button type="button" aria-keyshortcuts="N" title="Next unreviewed file (N)" onClick={nextUnreviewed} disabled={!visibleFiles.some((file) => !isReviewed(file))}>Next unreviewed file</button>
         <label><input type="checkbox" checked={state.preferences.split ?? false} onChange={(event) => preference("split", event.target.checked)} /> Split view</label>
         <label><input type="checkbox" checked={state.preferences.ignoreWhitespace ?? false} onChange={(event) => preference("ignoreWhitespace", event.target.checked)} /> Ignore whitespace</label>
-        <label><input type="checkbox" checked={sinceReview} disabled={!baseline} onChange={(event) => preference("sinceReview", event.target.checked)} /> Changes since last review</label>
+        <label><input type="checkbox" checked={sinceReview} disabled={!baseline} onChange={(event) => { setSelection({}); preference("sinceReview", event.target.checked); }} /> {lastReview?.revision === baselineRevision ? "Changes since last review" : "Changes since baseline"}</label>
       </div>
       <div className="review-options">
         <label>Snapshot <select aria-label="Snapshot" value={viewedRevision} onChange={(event) => switchRevision(event.target.value)}>{Object.entries(revisions).map(([key, value]) => <option key={key} value={key}>{key.slice(0, 8)}{key === details.revision ? " (current)" : ""} · {value.details.syncedAt ? new Date(value.details.syncedAt).toLocaleString() : "Imported snapshot"}</option>)}</select></label>
-        <label>Review baseline <select aria-label="Review baseline" value={state.baselineRevision ?? ""} onChange={(event) => update({ type: "baseline", revision: event.target.value })}>
+        <label>Review baseline <select aria-label="Review baseline" value={baselineRevision ?? ""} onChange={(event) => chooseBaseline(event.target.value)}>
+          {baselineRevision && !baseline && <option value={baselineRevision}>{baselineRevision.slice(0, 8)} (snapshot unavailable)</option>}
           <option value="" disabled>Mark a file reviewed or choose a snapshot</option>{Object.keys(revisions).map((key) => <option key={key} value={key}>{key.slice(0, 8)}</option>)}
         </select></label>
-        <button type="button" onClick={() => update({ type: "baseline", revision })}>Use this snapshot as baseline</button>
+        <button type="button" onClick={() => chooseBaseline(revision)}>Use this snapshot as baseline</button>
+        {lastReview && baselineRevision !== lastReview.revision && <button type="button" onClick={() => chooseBaseline(lastReview.revision)}>Use last submitted review</button>}
       </div>
       <p className="review-muted">{details.syncedAt ? `Last synced ${new Date(details.syncedAt).toLocaleString()}.` : "This is a legacy snapshot; sync for full context and commit history."}</p>
       {viewedRevision !== details.revision && <p className="revision-warning">Viewing an earlier snapshot. <button onClick={() => switchRevision(details.revision)}>Return to current snapshot</button></p>}
-      {sinceReview && <p className="revision-warning">Comparing {state.baselineRevision.slice(0, 8)} → {revision.slice(0, 8)}. Old lines belong to the baseline snapshot.</p>}
+      {!lastReview && <p className="review-muted">No submitted review yet. Choose a baseline to compare snapshots.</p>}
+      {lastReview && !baseline && <p className="revision-warning">The last reviewed snapshot is not available locally. Open the comparison on GitHub or choose an available baseline.</p>}
+      {baselineRevision && <div className="review-changes-summary">
+        <div><strong>{lastReview?.revision === baselineRevision ? "Since your last submitted review" : "Since the selected baseline"}</strong>
+          <p>{changes ? `${changes.files.length} files changed${changes.commits ? ` · ${changes.commits.length} new commits` : " · Commit history unavailable; Refresh to import it"}` : "Saved file comparison unavailable"}</p>
+        </div>
+        {baseline && <button type="button" onClick={() => { setQuery(""); setSelection({}); preference("sinceReview", !sinceReview); }}>{sinceReview ? "Show full PR diff" : "Show only these changes"}</button>}
+        {details.link && /^[a-f0-9]{40}$/i.test(baselineRevision) && /^[a-f0-9]{40}$/i.test(snapshot.details.headSha ?? "") && <a href={`${details.link.replace(/\/pull\/\d+\/?$/, "")}/compare/${baselineRevision}...${snapshot.details.headSha}`} target="_blank" rel="noreferrer">Compare on GitHub ↗</a>}
+        {changes?.commits?.length > 0 && <details className="review-new-commits"><summary>New commits</summary><ul>{changes.commits.map((commit) => <li key={commit.oid}><code>{commit.oid.slice(0, 8)}</code> {commit.messageHeadline}</li>)}</ul></details>}
+        {changes?.files.some((file) => file.comparisonUnavailable) && <p className="review-muted">Some file contents are unavailable. Those files remain visible for manual review.</p>}
+      </div>}
+      {sinceReview && <p className="revision-warning">Comparing {baselineRevision.slice(0, 8)} → {revision.slice(0, 8)}. Old lines belong to the baseline snapshot.</p>}
     </div>
     <div className="review-layout">
       <aside className="review-sidebar" aria-label="Changed files">
         <input type="search" aria-label="Search changed files" placeholder="Search files" value={query} onChange={(event) => setQuery(event.target.value)} />
         {visibleFiles.map((file) => <button type="button" key={file.path} className={selectedFile === file.path ? "active" : ""} onClick={() => goTo(file.path)}>
-          <span>{isReviewed(file) ? "✓" : state.reviewed[file.path] ? "↻" : "○"}</span><span>{file.path}</span>
+          <span>{isReviewed(file) ? "✓" : state.reviewed[file.path] ? "↻" : "○"}</span><span>{file.path}{changedPaths.has(file.path) && <small className="file-change-marker">Changed since {lastReview?.revision === baselineRevision ? "review" : "baseline"}</small>}</span>
         </button>)}
       </aside>
       <div className="review-files">
@@ -206,11 +230,12 @@ export default function ReviewWorkspace({ details, diff, revisions, active, navi
             <header className="review-file-header">
               <button type="button" aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${file.path}`} aria-expanded={!isCollapsed} onClick={() => update({ type: "fileView", revision, filePath: file.path, view: { ...view, collapsed: !isCollapsed } })}>{isCollapsed ? "▸" : "▾"}</button>
               <strong>{file.path}</strong><span className="review-badge">{file.status}</span>
+              {changedPaths.has(file.path) && <span className="review-badge file-change-marker">Changed since {lastReview?.revision === baselineRevision ? "review" : "baseline"}</span>}
               {stale && <span className="revision-warning">Changed since you reviewed it</span>}
               <button type="button" onClick={() => onDraft({ ...draft, open: true, anchor: null })}>File comment</button>
               <label><input type="checkbox" aria-label={`Reviewed ${file.path}`} checked={isReviewed(file)} onChange={(event) => update({ type: "reviewed", filePath: file.path, revision, fingerprint: file.fingerprint ?? "unavailable", value: event.target.checked })} /> Reviewed</label>
             </header>
-            {!isCollapsed && <DiffFile file={file} notes={notes} draft={draft} onDraft={onDraft} onUpdate={update} onCancel={() => onDraft(newDraft())} onJump={jumpToNote} view={view} onView={(view) => update({ type: "fileView", revision, filePath: file.path, view })} split={state.preferences.split ?? false} ignoreWhitespace={state.preferences.ignoreWhitespace ?? false} selection={selection[file.path] ?? draft.anchor} anchorRevision={revision} leftRevision={sinceReview ? state.baselineRevision : revision} onSelect={(anchor) => {
+            {!isCollapsed && <DiffFile file={file} notes={notes} draft={draft} onDraft={onDraft} onUpdate={update} onCancel={() => onDraft(newDraft())} onJump={jumpToNote} view={view} onView={(view) => update({ type: "fileView", revision, filePath: file.path, view })} split={state.preferences.split ?? false} ignoreWhitespace={state.preferences.ignoreWhitespace ?? false} selection={selection[file.path] ?? draft.anchor} anchorRevision={revision} leftRevision={sinceReview ? baselineRevision : revision} onSelect={(anchor) => {
               const value = { ...anchor, sourceSide: sinceReview && anchor.side === "LEFT" ? "RIGHT" : anchor.side };
               setSelection((current) => ({ ...current, [file.path]: value }));
               onDraft({ ...draft, open: true, anchor: value });

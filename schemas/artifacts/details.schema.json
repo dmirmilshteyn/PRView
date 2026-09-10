@@ -30,6 +30,17 @@
     "checks"
   ],
   "properties": {
+    "mergeability": { "type": "string", "enum": ["MERGEABLE", "CONFLICTING", "UNKNOWN"] },
+    "reviewDecisionState": { "type": "string" },
+    "commitHistory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["oid", "messageHeadline"],
+        "properties": { "oid": { "type": "string" }, "messageHeadline": { "type": "string" } }
+      }
+    },
     "number": {
       "type": "integer",
       "minimum": 1

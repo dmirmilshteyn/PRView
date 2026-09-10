@@ -14,6 +14,7 @@ import ReviewChat from "./review/ReviewChat.jsx";
 import PullRequestContext from "./review/PullRequestContext.jsx";
 import StackNavigator from "./stack/StackNavigator.jsx";
 import PRStatusBadge from "./stack/PRStatusBadge.jsx";
+import MergeReadiness from "./review/MergeReadiness.jsx";
 import { hasMergeConflict } from "./stack/stack.js";
 import { getPullRequestStack, nextStackPullRequest } from "./stack/stack.js";
 import Link from "next/link";
@@ -172,8 +173,10 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
   const { details: ciDetails, error: ciError } = usePRStatus(prDetails[number]);
   const [assignment, setAssignment] = useState(null);
   const [requestedReviewers, setRequestedReviewers] = useState(null);
+  const [discussion, setDiscussion] = useState(null);
   const details = ciDetails ? {
     ...ciDetails,
+    ...(discussion?.source === prDetails[number] ? { github: discussion.github } : {}),
     ...(assignment?.source === prDetails[number] && Date.now() < assignment.until ? { assignees: assignment.assignees } : {}),
     ...(requestedReviewers?.source === prDetails[number] && Date.now() < requestedReviewers.until ? { reviewRequests: requestedReviewers.reviewRequests } : {}),
   } : ciDetails;
@@ -216,9 +219,17 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
       </div>
       {details.currentHeadSha && details.currentHeadSha !== details.headSha && <p className="revision-warning">New commits are available. Use Refresh to update the code snapshot.</p>}
       <StackNavigator stack={getPullRequestStack(details, stackPRs)} repository={details.repository} currentNumber={number} />
+      <MergeReadiness details={details} />
         <section className="pr-page-section pr-info-card" id="info" aria-labelledby="info-heading">
           <h2 className="pr-section-heading" id="info-heading">Info</h2>
-          <PullRequestContext details={details} />
+          <PullRequestContext details={details} onThreadUpdated={(result) => setDiscussion((previous) => {
+            const github = previous?.source === prDetails[number] ? previous.github : prDetails[number].github;
+            return { source: prDetails[number], github: {
+              ...github,
+              inlineComments: result.comment ? [...(github.inlineComments ?? []).filter((comment) => comment.id !== result.comment.id), result.comment] : github.inlineComments,
+              threads: result.thread ? (github.threads ?? []).map((thread) => thread.id === result.thread.id ? { ...thread, ...result.thread } : thread) : github.threads,
+            } };
+          })} />
           {ciError && <p className="pr-refresh-error" role="status">{ciError}</p>}
           <div className="detail-grid">
             <div className="detail-stat">

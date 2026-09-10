@@ -207,6 +207,12 @@
 .review-markdown th, .review-markdown td { border: 1px solid #405063; padding: 0.4rem; }
 .review-markdown input[type=checkbox] { margin-right: 0.5rem; }
 .discussion-threads { display: grid; gap: 1rem; }
+.github-thread-actions { padding: 0.5rem 0.75rem; border-top: 1px solid #2b3b49; }
+.github-thread-buttons { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+.github-thread-actions button { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+.github-thread-actions form { display: grid; justify-items: start; gap: 0.5rem; margin-top: 0.5rem; }
+.github-thread-actions textarea { width: 100%; min-height: 5rem; resize: vertical; padding: 0.6rem; background: #101923; color: #e1e7ef; border: 1px solid #3c5365; border-radius: 0.4rem; font: inherit; font-size: 0.8rem; }
+.github-thread-actions p { margin: 0.4rem 0 0; font-size: 0.75rem; }
 .pr-discussion { margin-top: 1.7rem; }
 .pr-discussion > summary { cursor: pointer; color: #c3d2df; padding: 0.4rem 0; }
 .pr-discussion > summary h2 { display: inline; margin: 0; }
@@ -482,6 +488,30 @@ h1 {
 .review-preview-comment { margin: 0.75rem 0; padding: 0.85rem; border: 1px solid #344456; border-radius: 6px; overflow-wrap: anywhere; }
 .live-pr-status, .stack-review-navigation { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin: 0.85rem 0; color: #a6b8c8; font-size: 0.85rem; }
 .stack-review-progress { font-size: 0.7rem; color: #9aabba; }
+.merge-readiness { padding: 0.5rem 0.7rem; margin: 0.65rem 0; border: 1px solid #2b3c48; border-radius: 0.45rem; background: #131d27; }
+.merge-readiness > summary { cursor: pointer; font-size: 0.78rem; line-height: 1.7; }
+.merge-readiness > summary > strong { margin-right: 0.5rem; }
+.readiness-summary-items { display: inline-flex; flex-wrap: wrap; gap: 0.3rem 0.65rem; margin-left: 0.65rem; font-size: 0.7rem; }
+.readiness-summary-item.attention { color: #edc880; }
+.readiness-summary-item.unknown { color: #9eafbd; }
+.merge-readiness h2 { font-size: 0.95rem; margin: 0; }
+.merge-readiness ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 0.5rem 1rem; padding: 0; margin: 0.65rem 0; list-style: none; }
+.readiness-item { display: flex; align-items: flex-start; gap: 0.65rem; font-size: 0.8rem; min-width: 0; }
+.readiness-item p { margin: 0.25rem 0 0; color: #9eafbd; font-size: 0.75rem; overflow-wrap: anywhere; }
+.readiness-item small { display: inline-block; margin-left: 0.4rem; color: #8e9daa; font-size: 0.65rem; }
+.readiness-icon { display: grid; place-items: center; flex: 0 0 1.2rem; height: 1.2rem; border-radius: 50%; background: #2a3440; color: #acb9c6; font-weight: 700; }
+.readiness-item.pass .readiness-icon { color: #91d8ab; background: #243c30; }
+.readiness-item.attention .readiness-icon { color: #efd092; background: #423622; }
+.review-changes-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem 0.65rem; border: 1px solid #3c5365; background: #182733; border-radius: 0.4rem; padding: 0.45rem 0.65rem; margin-top: 0.5rem; font-size: 0.75rem; }
+.review-changes-summary button { padding: 0.25rem 0.45rem; font-size: 0.72rem; }
+.review-changes-summary > div:first-child { flex: 1 1 240px; }
+.review-changes-summary p { color: #a1b7c8; margin: 0; font-size: 0.72rem; }
+.review-changes-summary a { color: #91c5e6; }
+.review-new-commits { flex-basis: 100%; overflow-wrap: anywhere; }
+.review-new-commits summary { cursor: pointer; }
+.review-new-commits li { margin-top: 0.4rem; }
+.file-change-marker { color: #edc880; }
+.review-sidebar .file-change-marker { display: block; font-size: 0.65rem; margin-top: 0.2rem; }
 .live-pr-status { justify-content: flex-start; gap: 0.5rem; }
 .pr-status-badge { display: inline-flex; align-items: center; gap: 0.4rem; border: 1px solid transparent; border-radius: 999px; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: 550; line-height: 1.3; }
 .pr-status-badge svg { flex-shrink: 0; }

@@ -89,11 +89,14 @@ def build_details(repository, pull_request):
         "milestone": (pull_request.get("milestone") or {}).get("title") or "None",
         "draft": bool(pull_request.get("isDraft")),
         "mergeable": mergeable,
+        "mergeability": pull_request.get("mergeable") or "UNKNOWN",
         "reviewDecision": review_decision,
+        "reviewDecisionState": pull_request.get("reviewDecision") or "",
         "filesChanged": pull_request.get("changedFiles", 0),
         "additions": pull_request.get("additions", 0),
         "deletions": pull_request.get("deletions", 0),
         "commits": len(pull_request.get("commits") or []),
+        "commitHistory": [{"oid": commit["oid"], "messageHeadline": commit.get("messageHeadline", "")} for commit in pull_request.get("commits") or [] if commit.get("oid")],
         "checks": checks,
     }
 

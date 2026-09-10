@@ -3,9 +3,10 @@ import AutoMergeToggle from "./AutoMergeToggle.jsx";
 import GitHubMessage from "./GitHubMessage.jsx";
 import GitHubLink from "./GitHubLink.jsx";
 import LocalReviewComment from "./LocalReviewComment.jsx";
+import GitHubThreadActions from "./GitHubThreadActions.jsx";
 import { useLocalReview } from "./ReviewProvider.jsx";
 
-export default function PullRequestContext({ details }) {
+export default function PullRequestContext({ details, onThreadUpdated }) {
   const github = details.github;
   const { state, ready } = useLocalReview();
   return <section className="pr-context">
@@ -22,7 +23,7 @@ export default function PullRequestContext({ details }) {
       {(check.detailsUrl || check.targetUrl) && <a href={check.detailsUrl || check.targetUrl} target="_blank" rel="noreferrer">Details ↗</a>}
     </li>)}</ul> : <p>{details.checks}</p>}
     <details className="pr-discussion" open>
-    <summary><h2>PR discussion <span className="review-badge">GitHub read-only</span></h2></summary>
+    <summary><h2>PR discussion <span className="review-badge">GitHub</span></h2></summary>
     {!github && <p className="review-muted">Sync to import discussions.</p>}
     {github && !github.comments.length && !github.reviews.length && !github.inlineComments.length && <p>No GitHub discussion yet.</p>}
     <div className="discussion-threads">
@@ -46,6 +47,7 @@ export default function PullRequestContext({ details }) {
           <span className={`thread-state ${thread?.isResolved ? "is-resolved" : ""}`}>{thread?.isResolved ? "✓ Resolved" : "Open thread"}</span>
         </header>
         <div className="thread-messages">{[comment, ...replies].map((item) => <GitHubMessage message={item} key={item.id} />)}</div>
+        <GitHubThreadActions key={`${details.repository}:${details.number}:${comment.id}`} repository={details.repository} number={details.number} commentId={comment.id} thread={thread} onUpdated={onThreadUpdated} />
       </article>;
     })}
     {ready && (state.reviews ?? []).map((review) => <LocalReviewComment key={review.id} review={review} />)}

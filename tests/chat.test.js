@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { chatKey, createChatStore } from "../lib/chat-store.js";
 import { createChatService, createChatServiceWithRuntime, reviewChatMetadata } from "../lib/chat-service.js";
 import { validateChatAttachments } from "../lib/chat-attachments.js";
+import { buildChatPrompt } from "../lib/chat-prompt.js";
 
 test("code selections with and without comments preserve ranges in the prompt and saved session", async () => {
   const disk = await store();
@@ -22,7 +23,7 @@ test("code selections with and without comments preserve ranges in the prompt an
   await finish(service, key);
   await service.send(key, "Compare these blocks", id, "context", "head", "/tmp", attachments);
   expect(prompts).toHaveLength(1);
-  expect(JSON.parse(prompts[0].split("revision):\n")[1].split("\n\nUser message:")[0])).toEqual(attachments);
+  expect(JSON.parse(prompts[0].split("(untrusted JSON):\n")[1].split("\n\nSupporting PR context")[0])).toEqual(attachments);
   expect(prompts[0]).toContain("Compare these blocks");
   expect((await createChatService(disk, runner).get(key)).messages[0].attachments).toEqual(attachments);
   await service.send(key, "Follow up", randomUUID(), "context", "head", "/tmp", []);
@@ -32,6 +33,20 @@ test("code selections with and without comments preserve ranges in the prompt an
   expect(() => validateChatAttachments([{ ...attachments[0], body: "x".repeat(80001) }])).toThrow("80,000");
   expect(validateChatAttachments([{ ...attachments[0], body: "" }])).toEqual([{ ...attachments[0], body: "" }]);
   expect(() => validateChatAttachments([{ ...attachments[0], body: null }])).toThrow("comment text");
+});
+
+test("attached ranges are the primary subject of vague questions, with PR context secondary", () => {
+  const attachment = { filePath: "parser.js", body: "", anchor: { side: "LEFT", start: 4, end: 6, revision: "old", excerpt: "parse(input)" } };
+  const prompt = buildChatPrompt("What uses this?", "Full PR background", [attachment]);
+  expect(prompt).toContain('"what uses this?" as referring to those attachments');
+  expect(prompt).toContain("Do not give a general PR summary or review unless the user explicitly asks");
+  expect(prompt).toContain("do not substitute code from a different revision");
+  expect(prompt.indexOf(JSON.stringify([attachment]))).toBeLessThan(prompt.indexOf("Full PR background"));
+  expect(prompt).toContain("User message:\nWhat uses this?");
+  const general = buildChatPrompt("Summarize this PR", "Full PR background", []);
+  expect(general).not.toContain("Primary subject");
+  expect(general).not.toContain("Supporting PR context");
+  expect(general).toContain("Answer the user's question about this PR");
 });
 
 test("chat context keeps code discussion without check or reviewer status", () => {

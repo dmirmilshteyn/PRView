@@ -10,7 +10,7 @@ export function hasMergeConflict(details) {
   if (["MERGED", "CLOSED"].includes(details.liveState ?? details.state)) {
     return false;
   }
-  return details.mergeConflict ?? (details.mergeable === false || details.mergeable === "CONFLICTING" || details.mergeState === "dirty");
+  return details.mergeConflict ?? (details.mergeability ? details.mergeability === "CONFLICTING" : details.mergeable === false || details.mergeable === "CONFLICTING" || details.mergeState === "dirty");
 }
 
 export function pullRequestCI(details) {

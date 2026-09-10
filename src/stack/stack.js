@@ -6,6 +6,13 @@ export function hasPullRequestApproval(details) {
   return (details.github?.reviews ?? details.reviewHistory ?? []).some((review) => review.state === "APPROVED");
 }
 
+export function hasMergeConflict(details) {
+  if (["MERGED", "CLOSED"].includes(details.liveState ?? details.state)) {
+    return false;
+  }
+  return details.mergeConflict ?? (details.mergeable === false || details.mergeable === "CONFLICTING" || details.mergeState === "dirty");
+}
+
 export function pullRequestCI(details) {
   const checks = details.checkRuns ?? [];
   if (!checks.length) {
@@ -39,7 +46,11 @@ export function getPullRequestStack(current, imported) {
       source: "github",
       entries: [...current.stack.entries].reverse().map((entry) => ({
         ...entry,
+        state: entry.number === current.number ? current.liveState ?? entry.state : entry.state,
+        mergeConflict: hasMergeConflict(entry.number === current.number ? current : repositoryPRs.find((pr) => pr.number === entry.number) ?? entry),
         available: availableNumbers.has(entry.number),
+        revision: entry.number === current.number ? current.currentHeadSha ?? current.revision : repositoryPRs.find((pr) => pr.number === entry.number)?.revision,
+        reviewProgress: repositoryPRs.find((pr) => pr.number === entry.number)?.reviewProgress ?? "unreviewed",
         approved: entry.number === current.number
           ? hasPullRequestApproval(current)
           : repositoryPRs.find((pr) => pr.number === entry.number)?.approved === true,
@@ -74,4 +85,26 @@ export function nextStackPullRequest(stack, currentNumber) {
     return null;
   }
   return stack.entries.slice(0, index).reverse().find((entry) => entry.available && !["MERGED", "CLOSED"].includes(entry.state)) ?? null;
+}
+
+export function previousStackPullRequest(stack, currentNumber) {
+  const index = stack?.entries.findIndex((entry) => entry.number === Number(currentNumber)) ?? -1;
+  if (index < 0) {
+    return null;
+  }
+  return stack.entries.slice(index + 1).find((entry) => entry.available && !["MERGED", "CLOSED"].includes(entry.state)) ?? null;
+}
+
+export function stackReviewProgress(review, revision) {
+  const finished = (review.reviews ?? []).filter((item) => !item.github || item.github.status === "submitted");
+  if (revision && finished.some((item) => item.revision === revision)) {
+    return "reviewed";
+  }
+  if (finished.length) {
+    return "outdated";
+  }
+  if (Object.keys(review.reviewed ?? {}).length || review.notes?.length) {
+    return "in-progress";
+  }
+  return "unreviewed";
 }

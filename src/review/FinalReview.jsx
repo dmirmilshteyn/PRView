@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocalReview } from "./ReviewProvider.jsx";
+import ReviewSubmissionPreview from "./ReviewSubmissionPreview.jsx";
 
 export default function FinalReview({ revision, currentRevision, reviewedCount, fileCount }) {
-  const { state, status, error, update, retry, nextPR } = useLocalReview();
+  const { state, status, error, update, retry, nextPR, repository, number } = useLocalReview();
   const router = useRouter();
   const navigated = useRef(null);
   const [submittedId, setSubmittedId] = useState(null);
+  const [previewReview, setPreviewReview] = useState(null);
   const draft = state.reviewDrafts?.[revision] ?? { body: "", event: "COMMENT" };
   const pendingReview = state.reviews?.find((review) => review.github && !["submitted", "cancelled"].includes(review.github.status));
   const submittedReview = state.reviews?.find((review) => review.id === submittedId);
@@ -35,12 +37,15 @@ export default function FinalReview({ revision, currentRevision, reviewedCount, 
     if (status !== "Saved" || pendingReview || (draft.event !== "APPROVE" && !draft.body.trim())) {
       return;
     }
-    const id = crypto.randomUUID();
-    update({ type: "finalReview", review: { id, revision, event: draft.event, body: draft.body.trim(), source: "local", createdAt: new Date().toISOString() } });
-    setSubmittedId(id);
+    setPreviewReview({ id: crypto.randomUUID(), revision, event: draft.event, body: draft.body.trim(), source: "local", createdAt: new Date().toISOString() });
   }
 
   return <form className="final-review" aria-labelledby="final-review-heading" onSubmit={submit}>
+    {previewReview && <ReviewSubmissionPreview repository={repository} number={number} review={previewReview} onClose={() => setPreviewReview(null)} onConfirm={(previewToken) => {
+      update({ type: "finalReview", review: previewReview, previewToken });
+      setSubmittedId(previewReview.id);
+      setPreviewReview(null);
+    }} />}
     <div className="context-heading"><h2 id="final-review-heading">Finish your review</h2><span className="review-muted">{reviewedCount} of {fileCount} files reviewed</span></div>
     <p className="review-muted">Save locally and submit to GitHub, including saved, unresolved file and line comments that have not been submitted yet.</p>
     {revision !== currentRevision && <p className="revision-warning">Reviewing an earlier snapshot: {revision.slice(0, 8)}.</p>}

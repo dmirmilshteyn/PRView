@@ -54,6 +54,9 @@ export function useReview(repository, number) {
         const result = await response.json();
         if (!response.ok) {
           if (result.state) {
+            if (operation.type === "finalReview" && !result.state.reviews.some((review) => review.id === operation.review.id)) {
+              queue.current.shift();
+            }
             setState(queue.current.reduce(applyOperation, result.state));
           }
           throw new Error(result.error);
@@ -63,7 +66,7 @@ export function useReview(repository, number) {
       }
       setStatus("Saved");
     } catch (failure) {
-      setStatus("Not saved");
+      setStatus(queue.current.length ? "Not saved" : "Saved");
       setError(failure.message);
     } finally {
       saving.current = false;

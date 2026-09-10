@@ -3,7 +3,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import App from "../../src/App.jsx";
 import { readReview } from "../../lib/review-store.js";
-import { hasPullRequestApproval, pullRequestCI } from "../../src/stack/stack.js";
+import { hasMergeConflict, hasPullRequestApproval, pullRequestCI, stackReviewProgress } from "../../src/stack/stack.js";
 
 function readJson(filePath, fallback) {
   try {
@@ -41,7 +41,7 @@ async function loadReviewData(number) {
     pr.author = details.author;
     pr.labels = details.labels ?? [];
     const review = await readReview(path.join(process.cwd(), ".local-reviews"), details.repository, details.number);
-    return { number: details.number, repository: details.repository, approved: hasPullRequestApproval(details), ci: pullRequestCI(details), pinned: review.pinned === true };
+    return { number: details.number, repository: details.repository, revision: details.revision, mergeConflict: hasMergeConflict(details), reviewProgress: stackReviewProgress(review, details.revision), approved: hasPullRequestApproval(details), ci: pullRequestCI(details), pinned: review.pinned === true };
   }))).filter(Boolean);
 
   try {

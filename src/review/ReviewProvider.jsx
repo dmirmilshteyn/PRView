@@ -9,5 +9,5 @@ export function useLocalReview() {
 
 export default function ReviewProvider({ repository, number, nextPR, children }) {
   const review = useReview(repository, number);
-  return <ReviewContext.Provider value={{ ...review, nextPR }}>{children}</ReviewContext.Provider>;
+  return <ReviewContext.Provider value={{ ...review, nextPR, repository, number }}>{children}</ReviewContext.Provider>;
 }

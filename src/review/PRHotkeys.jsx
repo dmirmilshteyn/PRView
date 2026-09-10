@@ -1,45 +1,58 @@
 import { useEffect, useState } from "react";
 import AssignSelfDialog from "./AssignSelfDialog.jsx";
 import ReviewerDialog from "./ReviewerDialog.jsx";
+import HotkeyHelp from "./HotkeyHelp.jsx";
+import { createHotkeyMatcher } from "./hotkey-matcher.js";
 
 export default function PRHotkeys({ link, repository, number, onAssigned, onReviewerRequested }) {
   const [toast, setToast] = useState(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [reviewerOpen, setReviewerOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => {
-    const pressed = new Set();
+    const matcher = createHotkeyMatcher();
     let timer;
     let active = true;
     let copying = false;
 
     function reset() {
-      pressed.clear();
+      matcher.reset();
     }
 
     async function onKeyDown(event) {
-      if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || document.querySelector("dialog[open]") || event.target.closest?.("input, textarea, select, [contenteditable]:not([contenteditable='false']), [role='textbox']")) {
+      if (event.defaultPrevented || event.isComposing || event.ctrlKey || event.metaKey || event.altKey || document.querySelector("dialog[open]") || event.target.closest?.("input, textarea, select, [contenteditable]:not([contenteditable='false']), [role='textbox']")) {
         reset();
         return;
       }
       if (event.repeat) {
         return;
       }
+      if (event.key === "?") {
+        event.preventDefault();
+        reset();
+        setHelpOpen(true);
+        return;
+      }
+      if (event.shiftKey) {
+        reset();
+        return;
+      }
       const key = event.key.toLowerCase();
-      pressed.add(key);
-      if (pressed.has("e") && pressed.has("r") && pressed.size === 2) {
+      const action = matcher.keyDown(key, performance.now());
+      if (action === "reviewer") {
         event.preventDefault();
         reset();
         setReviewerOpen(true);
         return;
       }
-      if (pressed.has("e") && pressed.has("a") && pressed.size === 2) {
+      if (action === "assign") {
         event.preventDefault();
         reset();
         setAssignOpen(true);
         return;
       }
-      if (!pressed.has("c") || !pressed.has("g") || pressed.size !== 2 || copying) {
+      if (action !== "copy" || copying) {
         return;
       }
       event.preventDefault();
@@ -65,7 +78,7 @@ export default function PRHotkeys({ link, repository, number, onAssigned, onRevi
     }
 
     function onKeyUp(event) {
-      pressed.delete(event.key.toLowerCase());
+      matcher.keyUp(event.key.toLowerCase());
     }
 
     window.addEventListener("keydown", onKeyDown);
@@ -83,6 +96,8 @@ export default function PRHotkeys({ link, repository, number, onAssigned, onRevi
   }, [link]);
 
   return <>
+    <button className="hotkey-help-button pr-pin" type="button" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" onClick={() => setHelpOpen(true)}>?</button>
+    {helpOpen && <HotkeyHelp onClose={() => setHelpOpen(false)} />}
     {assignOpen && <AssignSelfDialog repository={repository} number={number} onClose={() => setAssignOpen(false)} onAssigned={onAssigned} />}
     {reviewerOpen && <ReviewerDialog repository={repository} number={number} onClose={() => setReviewerOpen(false)} onRequested={onReviewerRequested} />}
     <div className="pr-hotkey-toast" role="status" aria-live="polite" aria-atomic="true">{toast && <span>{toast}</span>}</div>

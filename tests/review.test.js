@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, writeFile, readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { readReview, updateReview } from "../lib/review-store.js";
@@ -22,6 +23,26 @@ async function temporaryRoot() {
 function note(id) {
   return { id, revision: "commit-a", filePath: "src/app.js", body: "Handle null input", anchor: { side: "RIGHT", start: 4, end: 6, excerpt: "original code" }, severity: "warning", resolved: false, createdAt: "2026-09-09T00:00:00Z", replies: [] };
 }
+
+test("legacy review records gain missing fields without losing notes, drafts, or preferences", async () => {
+  const root = await temporaryRoot();
+  const folder = path.join(root, createHash("sha256").update("owner/repo").digest("hex"));
+  await mkdir(folder, { recursive: true });
+  const file = path.join(folder, "42.json");
+  const legacy = { version: 1, notes: [note("legacy")], drafts: { saved: { body: "Unfinished thought" } }, preferences: { split: true }, pinned: true };
+  await writeFile(file, JSON.stringify(legacy));
+  const loaded = await readReview(root, "owner/repo", 42);
+  expect(loaded).toEqual({ ...emptyReview(), ...legacy });
+  expect(loaded.reviews.filter((review) => review.body?.trim())).toEqual([]);
+  expect(JSON.parse(await readFile(file, "utf8"))).toEqual(legacy);
+  await updateReview(root, "owner/repo", 42, { type: "pin", value: false });
+  const saved = await readReview(root, "owner/repo", 42);
+  expect(saved.notes).toEqual(legacy.notes);
+  expect(saved.drafts).toEqual(legacy.drafts);
+  expect(saved.preferences).toEqual(legacy.preferences);
+  expect(saved.reviews).toEqual([]);
+  expect(saved.pinned).toBe(false);
+});
 
 test("local state survives re-reading and isolates repositories sharing a PR number", async () => {
   const root = await temporaryRoot();

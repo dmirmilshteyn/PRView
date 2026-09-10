@@ -172,7 +172,7 @@
 .stack-signal svg { flex-shrink: 0; }
 .stack-signal.success { color: #79ca87; }
 .stack-status { flex: 0 0 auto; font-size: 0.7rem; font-weight: 600; line-height: 1.5; padding: 0.05rem 0.45rem; border-radius: 20px; background: #20352a; color: #65b66e; }
-.stack-badges { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.65rem; max-width: 35%; }
+.stack-badges { display: flex; flex-wrap: wrap; align-self: center; align-items: center; justify-content: flex-end; gap: 0.65rem; max-width: 35%; }
 .stack-status.approved { background: #204333; color: #89d9a4; }
 .stack-status.draft { color: #aeb7c2; background: #2b3039; }
 .stack-status.merged { color: #c4a2ed; background: #342841; }
@@ -356,13 +356,13 @@ h1 {
 
 .pr-groups {
   display: grid;
-  gap: 3rem;
+  gap: 1.75rem;
 }
 
 .group-heading {
   border-bottom: 1px solid #22303d;
-  margin-bottom: 1.15rem;
-  padding-bottom: 1rem;
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.6rem;
 }
 
 .group-title {
@@ -413,7 +413,7 @@ h1 {
 
 .pr-list {
   display: grid;
-  gap: 0.9rem;
+  gap: 0.5rem;
 }
 
 .change-stats { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0.55rem; font-size: 0.78rem; font-variant-numeric: tabular-nums; }
@@ -422,16 +422,16 @@ h1 {
 .change-bar { display: inline-flex; width: 84px; height: 7px; border-radius: 3px; overflow: hidden; background: #344456; }
 .change-bar-added { background: #57bf80; }
 .change-bar-deleted { background: #e57180; }
-.pr-card-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.65rem 1rem; margin-top: 0.75rem; }
-.pr-card .pr-card-author { font-size: 0.8rem; margin-bottom: 0.35rem; overflow-wrap: anywhere; }
+.pr-card-footer { display: flex; align-items: center; flex-wrap: wrap; gap: 0.35rem 0.85rem; margin-top: 0.4rem; }
+.pr-card .pr-card-author { font-size: 0.75rem; overflow-wrap: anywhere; }
 .pr-card-labels { margin-left: auto; justify-content: flex-end; }
-.pr-card-labels .label { padding: 0.2rem 0.55rem; overflow-wrap: anywhere; max-width: 100%; }
+.pr-card-labels .label { padding: 0.1rem 0.45rem; font-size: 0.7rem; overflow-wrap: anywhere; max-width: 100%; }
 
 .pr-card {
   background: rgba(19, 29, 39, 0.82);
   border: 1px solid #253542;
   border-radius: 0.55rem;
-  padding: 1.15rem 1.25rem;
+  padding: 0.7rem 0.9rem;
   transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
 }
 
@@ -444,13 +444,15 @@ h1 {
 .pr-card-header {
   align-items: center;
   display: flex;
+  gap: 0.75rem;
   justify-content: space-between;
+  margin-bottom: 0.25rem;
 }
 .pr-card-wrapper { position: relative; }
 .pr-card-wrapper .pr-card { display: block; }
 .pr-card-wrapper .card-arrow { margin-right: 6rem; }
 .pr-pin { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.65rem; border: 1px solid #344456; border-radius: 5px; background: #182330; color: #a9b9c8; font: inherit; font-size: 0.75rem; cursor: pointer; }
-.pr-card-wrapper > .pr-pin { position: absolute; right: 1rem; top: 1rem; }
+.pr-card-wrapper > .pr-pin { position: absolute; right: 0.75rem; top: 0.6rem; padding: 0.25rem 0.5rem; }
 .pr-pin:hover { background: #25374a; color: #e8eef5; }
 .pr-pin.is-pinned { color: #e8c47e; border-color: #76613c; background: #332d21; }
 .pr-pin:focus-visible { outline: 2px solid #76d3b2; outline-offset: 3px; }
@@ -470,6 +472,27 @@ h1 {
 .pr-confirm-actions button:focus-visible { outline: 2px solid #76d3b2; outline-offset: 3px; }
 .pr-confirm-actions button:disabled { opacity: 0.55; cursor: wait; }
 .pr-confirm-actions kbd { font: inherit; font-size: 1rem; opacity: 0.75; }
+.review-modal { width: min(680px, calc(100vw - 2rem)); max-height: 85dvh; overflow-y: auto; }
+.hotkey-list { display: grid; gap: 0.85rem; }
+.hotkey-list > div { display: grid; grid-template-columns: 130px 1fr; gap: 1rem; }
+.hotkey-list dd { margin: 0; }
+.hotkey-list kbd { padding: 0.15rem 0.35rem; border: 1px solid #405463; border-radius: 4px; }
+.hotkey-help-button { position: absolute; top: -2.5rem; right: 0; }
+.pr-detail { position: relative; }
+.review-preview-comment { margin: 0.75rem 0; padding: 0.85rem; border: 1px solid #344456; border-radius: 6px; overflow-wrap: anywhere; }
+.live-pr-status, .stack-review-navigation { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin: 0.85rem 0; color: #a6b8c8; font-size: 0.85rem; }
+.stack-review-progress { font-size: 0.7rem; color: #9aabba; }
+.live-pr-status { justify-content: flex-start; gap: 0.5rem; }
+.pr-status-badge { display: inline-flex; align-items: center; gap: 0.4rem; border: 1px solid transparent; border-radius: 999px; padding: 0.3rem 0.6rem; font-size: 0.75rem; font-weight: 550; line-height: 1.3; }
+.pr-status-badge svg { flex-shrink: 0; }
+.pr-status-badge.conflict { color: #f3b0a5; background: #392729; border-color: #704139; }
+.pr-status-badge.review-pending { color: #ead099; background: #332e22; border-color: #625337; }
+.pr-status-badge.review-clear { color: #9cabb8; background: #1b2631; border-color: #2d3b48; }
+.pr-status-count { display: inline-grid; place-items: center; min-width: 1.15rem; height: 1.15rem; padding: 0 0.2rem; border-radius: 50%; background: #ead0991a; font-size: 0.7rem; }
+.pr-merge-status { color: #9cabb8; font-size: 0.78rem; margin: 0 0.25rem; }
+.stack-badges .pr-status-badge { font-size: 0.7rem; padding: 0.15rem 0.45rem; }
+.stack-review-progress.reviewed { color: #7edba2; }
+.stack-review-progress.outdated { color: #e8c47e; }
 .reviewer-dialog { width: min(480px, calc(100vw - 2rem)); }
 .reviewer-search { box-sizing: border-box; width: 100%; border: 1px solid #405463; border-radius: 6px; background: #0d161f; color: #e8eef5; padding: 0.75rem; font: inherit; }
 .reviewer-search:focus { outline: 2px solid #76d3b2; outline-offset: 1px; }
@@ -490,14 +513,17 @@ h1 {
 
 .card-arrow {
   color: #718495;
+  flex-shrink: 0;
   font-size: 1.15rem;
 }
 
 .pr-card h3 {
-  font-size: 1.02rem;
+  font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: -0.015em;
-  margin: 0.65rem 0 0.45rem;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .pr-card p,

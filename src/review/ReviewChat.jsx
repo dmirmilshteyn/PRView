@@ -4,6 +4,7 @@ import CommentTime from "./CommentTime.jsx";
 import { ChatAttachmentsContext } from "./ChatAttachmentsContext.jsx";
 import ChatAttachments from "./ChatAttachments.jsx";
 import { validateChatAttachments } from "../../lib/chat-attachments.js";
+import { chatDraftKey, readChatDraft, writeChatDraft, clearSentChatDraft } from "./chat-draft.js";
 
 export default function ReviewChat({ repository, number, children }) {
   const [open, setOpen] = useState(true);
@@ -14,6 +15,9 @@ export default function ReviewChat({ repository, number, children }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const [retry, setRetry] = useState(0);
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftError, setDraftError] = useState(null);
+  const draftRef = useRef("");
   const messagesRef = useRef(null);
   const composerRef = useRef(null);
   const follow = useRef(true);
@@ -22,6 +26,36 @@ export default function ReviewChat({ repository, number, children }) {
   const generation = useRef(0);
   const active = useRef(true);
   const url = `/api/chat?repository=${encodeURIComponent(repository)}&pr=${number}`;
+  const storageKey = chatDraftKey(repository, number);
+
+  useEffect(() => {
+    try {
+      const saved = readChatDraft(window.localStorage, storageKey);
+      draftRef.current = saved.message;
+      attachmentsRef.current = saved.attachments;
+      pendingRequest.current = saved.pendingRequest;
+      setDraft(saved.message);
+      setAttachments(saved.attachments);
+    } catch {
+      setDraftError("Could not restore the saved chat draft. New edits will replace it.");
+    }
+    setDraftReady(true);
+  }, [storageKey]);
+
+  function persistDraft() {
+    try {
+      writeChatDraft(window.localStorage, storageKey, { message: draftRef.current, attachments: attachmentsRef.current, pendingRequest: pendingRequest.current });
+      setDraftError(null);
+    } catch {
+      setDraftError("Could not save your chat draft in this browser. Keep this PR open until you send it.");
+    }
+  }
+
+  function changeDraft(value) {
+    draftRef.current = value;
+    setDraft(value);
+    persistDraft();
+  }
 
   useEffect(() => {
     active.current = true;
@@ -46,6 +80,19 @@ export default function ReviewChat({ repository, number, children }) {
         if (!cancelled && !sendingRef.current && startedAt === generation.current) {
           setChat(value);
           setError(null);
+          const pending = pendingRequest.current;
+          if (pending && value.messages.some((message) => message.id === pending.requestId && message.role === "user")) {
+            try {
+              const remaining = clearSentChatDraft(window.localStorage, storageKey, pending);
+              draftRef.current = remaining.message;
+              attachmentsRef.current = remaining.attachments;
+              pendingRequest.current = remaining.pendingRequest;
+              setDraft(remaining.message);
+              setAttachments(remaining.attachments);
+            } catch {
+              setDraftError("Your message was sent, but the saved draft could not be cleared.");
+            }
+          }
         }
         if (!cancelled) {
           timer = setTimeout(poll, value.status === "running" ? 1000 : 5000);
@@ -69,6 +116,7 @@ export default function ReviewChat({ repository, number, children }) {
   function updateAttachments(value) {
     attachmentsRef.current = value;
     setAttachments(value);
+    persistDraft();
   }
 
   useEffect(() => {
@@ -78,6 +126,9 @@ export default function ReviewChat({ repository, number, children }) {
   }, [open, attachments]);
 
   function attach(note) {
+    if (!draftReady) {
+      return false;
+    }
     setOpen(true);
     try {
       const attachment = { id: note.id, filePath: note.filePath, revision: note.revision, body: [note.body, ...(note.replies ?? []).map((reply) => `Reply: ${reply.body}`)].join("\n\n"), anchor: { ...note.anchor, revision: note.anchor?.revision ?? note.revision } };
@@ -92,7 +143,7 @@ export default function ReviewChat({ repository, number, children }) {
 
   async function send(event) {
     event.preventDefault();
-    if (!draft.trim() || sendingRef.current || chat?.status === "running") {
+    if (!draftReady || !draft.trim() || sendingRef.current || chat?.status === "running") {
       return;
     }
     const message = draft.trim();
@@ -100,6 +151,8 @@ export default function ReviewChat({ repository, number, children }) {
     if (pendingRequest.current?.message !== message || JSON.stringify(pendingRequest.current?.attachments) !== JSON.stringify(batch)) {
       pendingRequest.current = { message, attachments: batch, requestId: crypto.randomUUID() };
     }
+    const request = pendingRequest.current;
+    persistDraft();
     sendingRef.current = true;
     generation.current += 1;
     setSending(true);
@@ -111,11 +164,19 @@ export default function ReviewChat({ repository, number, children }) {
       if (!response.ok) {
         throw new Error(value.error);
       }
+      let remaining;
+      try {
+        remaining = clearSentChatDraft(window.localStorage, storageKey, request);
+      } catch {
+        remaining = { message: "", attachments: attachmentsRef.current.filter((item) => !batch.some((sent) => JSON.stringify(sent) === JSON.stringify(item))), pendingRequest: null };
+      }
       if (active.current) {
         setChat(value);
-        setDraft("");
-        updateAttachments(attachmentsRef.current.filter((item) => !batch.some((sent) => JSON.stringify(sent) === JSON.stringify(item))));
-        pendingRequest.current = null;
+        draftRef.current = remaining.message;
+        attachmentsRef.current = remaining.attachments;
+        pendingRequest.current = remaining.pendingRequest;
+        setDraft(remaining.message);
+        setAttachments(remaining.attachments);
       }
     } catch (failure) {
       if (active.current) {
@@ -149,13 +210,14 @@ export default function ReviewChat({ repository, number, children }) {
       </div>
       {error && <p className="chat-error" role="alert">{error} <button type="button" onClick={() => setRetry((value) => value + 1)}>Retry connection</button></p>}
       <form className="chat-compose" onSubmit={send}>
+        {draftError && <p className="chat-error" role="alert">{draftError}</p>}
         {attachments.length > 0 && <p className="review-muted" role="status">Pending context · included when you send your message</p>}
-        <ChatAttachments attachments={attachments} onRemove={sending ? null : (id) => updateAttachments(attachmentsRef.current.filter((item) => item.id !== id))} /><label className="stack-sr-only" htmlFor="review-chat-message">Message Luna</label><textarea ref={composerRef} id="review-chat-message" placeholder="Ask Luna about this PR…" value={draft} maxLength={10000} disabled={sending} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => {
+        <ChatAttachments attachments={attachments} onRemove={sending ? null : (id) => updateAttachments(attachmentsRef.current.filter((item) => item.id !== id))} /><label className="stack-sr-only" htmlFor="review-chat-message">Message Luna</label><textarea ref={composerRef} id="review-chat-message" placeholder="Ask Luna about this PR…" value={draft} maxLength={10000} disabled={sending || !draftReady} onChange={(event) => changeDraft(event.target.value)} onKeyDown={(event) => {
         if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
           event.preventDefault();
           event.currentTarget.form.requestSubmit();
         }
-      }} /><div><span title={chat?.sessionId || "A session starts with your first message"}>{chat?.sessionId ? `Session ${chat.sessionId.slice(0, 8)}` : "Luna · PR context included"}</span><button type="submit" disabled={!chat || sending || chat.status === "running" || !draft.trim()}>{sending ? "Sending…" : "Send"}</button></div></form>
+      }} /><div><span title={chat?.sessionId || "A session starts with your first message"}>{chat?.sessionId ? `Session ${chat.sessionId.slice(0, 8)}` : "Luna · PR context included"}</span><button type="submit" disabled={!draftReady || !chat || sending || chat.status === "running" || !draft.trim()}>{sending ? "Sending…" : "Send"}</button></div></form>
     </aside>
   </div></ChatAttachmentsContext.Provider>;
 }

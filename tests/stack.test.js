@@ -1,5 +1,21 @@
 import { expect, test } from "bun:test";
-import { getPullRequestStack, hasPullRequestApproval, nextStackPullRequest, pullRequestCI, stackEntryStatus } from "../src/stack/stack.js";
+import { getPullRequestStack, hasMergeConflict, hasPullRequestApproval, nextStackPullRequest, previousStackPullRequest, stackReviewProgress, pullRequestCI, stackEntryStatus } from "../src/stack/stack.js";
+
+test("merge conflicts use explicit live status over saved mergeability and ignore closed PRs", () => {
+  expect(hasMergeConflict({ mergeable: false })).toBe(true);
+  expect(hasMergeConflict({ mergeable: "CONFLICTING" })).toBe(true);
+  expect(hasMergeConflict({ mergeable: null })).toBe(false);
+  expect(hasMergeConflict({ mergeable: "UNKNOWN" })).toBe(false);
+  expect(hasMergeConflict({ mergeable: false, mergeConflict: false })).toBe(false);
+  expect(hasMergeConflict({ liveState: "MERGED", mergeConflict: true })).toBe(false);
+  expect(hasMergeConflict({ state: "CLOSED", mergeConflict: true })).toBe(false);
+});
+
+test("stack conflicts use the current live PR and each imported member's saved status", () => {
+  const current = { ...pr(1, "core", "main"), mergeable: false, mergeConflict: false, liveState: "OPEN", stack: { entries: [{ number: 1 }, { number: 2 }, { number: 3 }] } };
+  const imported = [current, { ...pr(2, "api", "core"), mergeConflict: true }, { ...pr(3, "other", "main"), repository: "other/repo", mergeConflict: true }];
+  expect(getPullRequestStack(current, imported).entries.map((entry) => entry.mergeConflict)).toEqual([false, true, false]);
+});
 
 function pr(number, branch, baseBranch) {
   return { number, branch, baseBranch, repository: "owner/repo", title: `PR ${number}`, draft: false };
@@ -87,4 +103,14 @@ test("stack approval tags come from each PR's synced reviews in the same reposit
   expect(getPullRequestStack(current, imported).entries.map(({ number, approved }) => ({ number, approved }))).toEqual([
     { number: 4, approved: false }, { number: 3, approved: false }, { number: 2, approved: true }, { number: 1, approved: true },
   ]);
+});
+
+test("stack progress distinguishes current, older, incomplete and cancelled reviews", () => {
+  expect(stackReviewProgress({ reviews: [{ revision: "head", event: "APPROVE", github: { status: "submitted" } }] }, "head")).toBe("reviewed");
+  expect(stackReviewProgress({ reviews: [{ revision: "old", event: "COMMENT" }] }, "head")).toBe("outdated");
+  expect(stackReviewProgress({ reviews: [{ revision: "head", github: { status: "cancelled" } }] }, "head")).toBe("unreviewed");
+  expect(stackReviewProgress({ reviewed: { file: {} } }, "head")).toBe("in-progress");
+  const stack = { entries: [{ number: 3, available: true }, { number: 2, available: false }, { number: 1, available: true }] };
+  expect(previousStackPullRequest(stack, 3)?.number).toBe(1);
+  expect(previousStackPullRequest(stack, 1)).toBeNull();
 });

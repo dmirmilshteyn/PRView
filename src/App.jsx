@@ -9,10 +9,12 @@ import PinProvider, { usePins } from "./review/PinProvider.jsx";
 import PinButton from "./review/PinButton.jsx";
 import RefreshButton from "./review/RefreshButton.jsx";
 import PRHotkeys from "./review/PRHotkeys.jsx";
-import useCIStatus from "./review/useCIStatus.js";
+import usePRStatus from "./review/usePRStatus.js";
 import ReviewChat from "./review/ReviewChat.jsx";
 import PullRequestContext from "./review/PullRequestContext.jsx";
 import StackNavigator from "./stack/StackNavigator.jsx";
+import PRStatusBadge from "./stack/PRStatusBadge.jsx";
+import { hasMergeConflict } from "./stack/stack.js";
 import { getPullRequestStack, nextStackPullRequest } from "./stack/stack.js";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -74,15 +76,14 @@ function PullRequestCard({ pullRequest }) {
     <div className="pr-card-wrapper">
     <Link className="pr-card" href={`/pull-requests/${pullRequest.number}`}>
       <div className="pr-card-header">
-        <span className="pr-number">#{pullRequest.number}</span>
+        <h3><span className="pr-number">#{pullRequest.number}</span>{" "}{pullRequest.title}</h3>
         <span className="card-arrow" aria-hidden="true">
           →
         </span>
       </div>
-      <h3>{pullRequest.title}</h3>
-      {pullRequest.author && <p className="pr-card-author">By {pullRequest.author}</p>}
       {pullRequest.shortSummary && <p>{pullRequest.shortSummary}</p>}
       <div className="pr-card-footer">
+        {pullRequest.author && <p className="pr-card-author">By {pullRequest.author}</p>}
         <ChangeStats additions={pullRequest.additions} deletions={pullRequest.deletions} />
         {pullRequest.labels?.length > 0 && <div className="labels pr-card-labels" aria-label="Labels">
           {pullRequest.labels.map((label) => <span className="label" key={label}>{label}</span>)}
@@ -168,13 +169,13 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
   const pullRequest = categories
     .flatMap((category) => getCategoryItems(pullRequests, category))
     .find((item) => String(item.number) === number);
-  const { details: ciDetails, error: ciError } = useCIStatus(prDetails[number]);
+  const { details: ciDetails, error: ciError } = usePRStatus(prDetails[number]);
   const [assignment, setAssignment] = useState(null);
   const [requestedReviewers, setRequestedReviewers] = useState(null);
   const details = ciDetails ? {
     ...ciDetails,
-    ...(assignment?.source === prDetails[number] ? { assignees: assignment.assignees } : {}),
-    ...(requestedReviewers?.source === prDetails[number] ? { reviewRequests: requestedReviewers.reviewRequests } : {}),
+    ...(assignment?.source === prDetails[number] && Date.now() < assignment.until ? { assignees: assignment.assignees } : {}),
+    ...(requestedReviewers?.source === prDetails[number] && Date.now() < requestedReviewers.until ? { reviewRequests: requestedReviewers.reviewRequests } : {}),
   } : ciDetails;
   const diff = prDiffs[number];
 
@@ -194,7 +195,7 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
     <ReviewProvider key={`${details.repository}:${number}`} repository={details.repository} number={details.number} nextPR={nextStackPullRequest(getPullRequestStack(details, stackPRs), number)}>
     <ReviewChat key={`${details.repository}:${number}`} repository={details.repository} number={details.number}>
     <article className="pr-detail" id="top">
-      <PRHotkeys key={`${details.repository}:${number}`} link={details.link} repository={details.repository} number={details.number} onAssigned={(result) => setAssignment({ source: prDetails[number], assignees: result.assignees })} onReviewerRequested={(result) => setRequestedReviewers({ source: prDetails[number], reviewRequests: result.reviewRequests })} />
+      <PRHotkeys key={`${details.repository}:${number}`} link={details.link} repository={details.repository} number={details.number} onAssigned={(result) => setAssignment({ source: prDetails[number], assignees: result.assignees, until: Date.now() + 60000 })} onReviewerRequested={(result) => setRequestedReviewers({ source: prDetails[number], reviewRequests: result.reviewRequests, until: Date.now() + 60000 })} />
       <div className="detail-kicker">
         <Link className="back-link" href="/pull-requests" aria-label="Back to pull requests">
           ←
@@ -206,6 +207,14 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
         </div>
       </div>
       <h1>{details.title}</h1>
+      <div className="live-pr-status" aria-label="Live pull request status">
+        <span className="review-badge">{details.liveState === "MERGED" ? "Merged" : details.liveState === "CLOSED" ? "Closed" : details.liveState ? details.draft ? "Draft" : "Open" : "Loading live status…"}</span>
+        {hasMergeConflict(details) ? <PRStatusBadge kind="conflict">Merge conflicts</PRStatusBadge> : details.liveState === "OPEN" && <span className="pr-merge-status">{details.mergeState === "unknown" ? "Checking mergeability…" : `Merge status: ${details.mergeState?.replaceAll("_", " ") ?? "unknown"}`}</span>}
+        <PRStatusBadge kind={details.reviewRequests?.length ? "review-pending" : "review-clear"}>
+          {details.reviewRequests?.length ? <><strong className="pr-status-count">{details.reviewRequests.length}</strong> {details.reviewRequests.length === 1 ? "review requested" : "reviews requested"}</> : "No outstanding reviews"}
+        </PRStatusBadge>
+      </div>
+      {details.currentHeadSha && details.currentHeadSha !== details.headSha && <p className="revision-warning">New commits are available. Use Refresh to update the code snapshot.</p>}
       <StackNavigator stack={getPullRequestStack(details, stackPRs)} repository={details.repository} currentNumber={number} />
         <section className="pr-page-section pr-info-card" id="info" aria-labelledby="info-heading">
           <h2 className="pr-section-heading" id="info-heading">Info</h2>

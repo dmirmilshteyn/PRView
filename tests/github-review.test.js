@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { createGitHubReviewService } from "../lib/github-review.js";
+import { createGitHubReviewService, previewGitHubReview } from "../lib/github-review.js";
 import { readReview, updateReview } from "../lib/review-store.js";
 
 const roots = [];
@@ -160,4 +160,18 @@ test("returning to draft reconciles an already submitted review instead of delet
   const state = await service.submit("owner/repo", 23, { type: "cancelReview", id: "review-1" });
   expect(state.reviews[0].github.status).toBe("submitted");
   expect(remote.calls.some((call) => call.method === "DELETE")).toBe(false);
+});
+
+test("preview shows the exact selected feedback and rejects changes before confirmation", async () => {
+  const { cwd, root, remote, service, operation } = await fixture();
+  const op = operation("COMMENT", "preview-1");
+  const preview = await previewGitHubReview(cwd, "owner/repo", 23, op.review);
+  expect(preview.comments).toHaveLength(3);
+  expect(remote.calls).toHaveLength(0);
+  await updateReview(root, "owner/repo", 23, { type: "reply", id: "line", reply: { id: "changed", body: "Feedback changed after preview", createdAt: "2026-09-09T00:00:00Z" } });
+  await expect(service.submit("owner/repo", 23, { ...op, previewToken: preview.token })).rejects.toThrow("changed after preview");
+  expect(remote.calls).toHaveLength(0);
+  const latest = await previewGitHubReview(cwd, "owner/repo", 23, op.review);
+  const saved = await service.submit("owner/repo", 23, { ...op, previewToken: latest.token });
+  expect(saved.reviews[0].github.comments).toEqual(latest.comments);
 });

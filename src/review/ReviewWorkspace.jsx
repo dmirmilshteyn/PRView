@@ -131,6 +131,12 @@ export default function ReviewWorkspace({ details, diff, revisions, active, navi
       goTo(next.path);
     }
   }
+  function previousFile() {
+    const index = visibleFiles.findIndex((file) => file.path === selectedFile);
+    if (index > 0) {
+      goTo(visibleFiles[index - 1].path);
+    }
+  }
   function reviewAndAdvance() {
     const index = Math.max(0, visibleFiles.findIndex((file) => file.path === selectedFile));
     const file = visibleFiles[index];
@@ -194,6 +200,10 @@ export default function ReviewWorkspace({ details, diff, revisions, active, navi
         event.preventDefault();
         nextUnreviewed();
       }
+      if (event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        previousFile();
+      }
       if (event.key.toLowerCase() === "m") {
         event.preventDefault();
         reviewAndAdvance();
@@ -241,6 +251,7 @@ export default function ReviewWorkspace({ details, diff, revisions, active, navi
     </div>
     <nav className="code-review-navigation" aria-label="Code review navigation" ref={navigationRef}>
       <div className="context-heading"><strong>Review · {reviewedCount}/{snapshot.diff.files.length} files reviewed</strong><span role="status">{status}</span></div>
+      <button type="button" aria-keyshortcuts="P" title="Previous file (P)" onClick={previousFile} disabled={visibleFiles.findIndex((file) => file.path === selectedFile) <= 0}>Previous file <kbd>P</kbd></button>
       <button type="button" aria-keyshortcuts="N" title="Next unreviewed file (N)" onClick={nextUnreviewed} disabled={!visibleFiles.some((file) => !isReviewed(file))}>Next unreviewed <kbd>N</kbd></button>
       <button type="button" aria-keyshortcuts="M" title="Mark reviewed and go to the next unreviewed file (M)" onClick={reviewAndAdvance} disabled={!visibleFiles.length}>Reviewed & next <kbd>M</kbd></button>
     </nav>

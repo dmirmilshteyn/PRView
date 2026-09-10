@@ -18,6 +18,7 @@ export default function ReviewWorkspace({ details, diff, revisions, active, navi
   const [jumpTarget, setJumpTarget] = useState(null);
   const [chosenBaseline, setChosenBaseline] = useState(null);
   const fileElements = useRef(new Map());
+  const navigationRef = useRef(null);
   const positionRef = useRef(null);
   const updateRef = useRef(update);
   const lastNavigation = useRef(null);
@@ -34,6 +35,19 @@ export default function ReviewWorkspace({ details, diff, revisions, active, navi
   const visibleFiles = files.filter((file) => file.path.toLowerCase().includes(query.toLowerCase()));
   const isReviewed = (file) => state.reviewed[file.path]?.fingerprint === file.fingerprint;
   const reviewedCount = snapshot.diff.files.filter(isReviewed).length;
+
+  useEffect(() => {
+    const bar = navigationRef.current;
+    if (!bar) {
+      return;
+    }
+    const workspace = bar.closest(".review-workspace");
+    const observer = new ResizeObserver(() => {
+      workspace.style.setProperty("--review-nav-height", `${bar.getBoundingClientRect().height}px`);
+    });
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, [ready]);
 
   useEffect(() => {
     if (!active || !ready || restored || jumpTarget) {
@@ -193,13 +207,10 @@ export default function ReviewWorkspace({ details, diff, revisions, active, navi
     return <div className="review-loading">{error ? <><p role="alert">{error}</p><button onClick={retry}>Retry loading review</button></> : "Loading review…"}</div>;
   }
 
-  return <section className="review-workspace">
-    <div className="review-toolbar">
-      <div className="context-heading"><strong>Review · {reviewedCount}/{snapshot.diff.files.length} files reviewed</strong><span role="status">{status}</span></div>
+  return <section className="review-workspace code-review-workspace">
+    <div className="review-toolbar" role="group" aria-label="Review settings">
       {error && <p role="alert">Your changes have not been saved: {error} <button onClick={retry}>Retry saving</button></p>}
       <div className="review-options">
-        <button type="button" aria-keyshortcuts="N" title="Next unreviewed file (N)" onClick={nextUnreviewed} disabled={!visibleFiles.some((file) => !isReviewed(file))}>Next unreviewed file</button>
-        <button type="button" aria-keyshortcuts="M" title="Mark reviewed and go to the next unreviewed file (M)" onClick={reviewAndAdvance} disabled={!visibleFiles.length}>Reviewed & next</button>
         <label><input type="checkbox" checked={state.preferences.split ?? false} onChange={(event) => preference("split", event.target.checked)} /> Split view</label>
         <label><input type="checkbox" checked={state.preferences.ignoreWhitespace ?? false} onChange={(event) => preference("ignoreWhitespace", event.target.checked)} /> Ignore whitespace</label>
         <label><input type="checkbox" checked={sinceReview} disabled={!baseline} onChange={(event) => { setSelection({}); preference("sinceReview", event.target.checked); }} /> {lastReview?.revision === baselineRevision ? "Changes since last review" : "Changes since baseline"}</label>
@@ -228,6 +239,11 @@ export default function ReviewWorkspace({ details, diff, revisions, active, navi
       </div>}
       {sinceReview && <p className="revision-warning">Comparing {baselineRevision.slice(0, 8)} → {revision.slice(0, 8)}. Old lines belong to the baseline snapshot.</p>}
     </div>
+    <nav className="code-review-navigation" aria-label="Code review navigation" ref={navigationRef}>
+      <div className="context-heading"><strong>Review · {reviewedCount}/{snapshot.diff.files.length} files reviewed</strong><span role="status">{status}</span></div>
+      <button type="button" aria-keyshortcuts="N" title="Next unreviewed file (N)" onClick={nextUnreviewed} disabled={!visibleFiles.some((file) => !isReviewed(file))}>Next unreviewed <kbd>N</kbd></button>
+      <button type="button" aria-keyshortcuts="M" title="Mark reviewed and go to the next unreviewed file (M)" onClick={reviewAndAdvance} disabled={!visibleFiles.length}>Reviewed & next <kbd>M</kbd></button>
+    </nav>
     <div className="review-layout">
       <aside className="review-sidebar" aria-label="Changed files">
         <input type="search" aria-label="Search changed files" placeholder="Search files" value={query} onChange={(event) => setQuery(event.target.value)} />

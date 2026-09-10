@@ -36,9 +36,12 @@ export default function PullRequestContext({ details, onThreadUpdated, children 
     </div>
     </div>
     <details className="pr-discussion" open>
-    <summary><h2>PR discussion</h2></summary>
+    <summary><h2>PR discussion</h2><span className="discussion-count">{entries.length}</span></summary>
     {!github && <p className="review-muted">Sync to import discussions.</p>}
-    {github && !github.comments.length && !github.reviews.length && !github.inlineComments.length && <p>No GitHub discussion yet.</p>}
+    {github && !entries.length && <div className="discussion-empty">
+      <span className="discussion-empty-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-8l-6 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" /><path d="M7 9h10M7 13h6" /></svg></span>
+      <div><strong>Start the discussion</strong><p>Share a question, feedback, or an update on this PR.</p></div>
+    </div>}
     <ol className="discussion-threads discussion-numbered" aria-label="PR discussion, oldest first">
     {entries.map((entry, index) => {
       const comment = entry.message;

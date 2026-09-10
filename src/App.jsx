@@ -80,9 +80,6 @@ function PullRequestCard({ pullRequest }) {
     <Link className="pr-card" href={`/pull-requests/${pullRequest.number}`}>
       <div className="pr-card-header">
         <h3><span className="pr-number">#{pullRequest.number}</span>{" "}{pullRequest.title}</h3>
-        <span className="card-arrow" aria-hidden="true">
-          →
-        </span>
       </div>
       {pullRequest.shortSummary && <p>{pullRequest.shortSummary}</p>}
       <div className="pr-card-footer">
@@ -91,9 +88,10 @@ function PullRequestCard({ pullRequest }) {
         {pullRequest.labels?.length > 0 && <div className="labels pr-card-labels" aria-label="Labels">
           {pullRequest.labels.map((label) => <span className="label" key={label}>{label}</span>)}
         </div>}
+        {pullRequest.mergeConflict && <div className="pr-card-badges"><PRStatusBadge kind="conflict">Merge conflicts</PRStatusBadge></div>}
       </div>
     </Link>
-    <PinButton number={pullRequest.number} />
+    <PinButton number={pullRequest.number} iconOnly={true} />
     </div>
   );
 }
@@ -215,12 +213,12 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
     <ReviewChat key={`${details.repository}:${number}`} repository={details.repository} number={details.number} details={details} onThreadUpdated={onThreadUpdated}>
     <article className="pr-detail" id="top">
       <div className="detail-kicker">
-        <Link className="back-link" href="/pull-requests" aria-label="Back to pull requests">
-          ←
+        <Link className="back-link pr-header-back" href="/pull-requests" aria-label={`Pull request #${pullRequest.number} — back to pull requests`}>
+          <span aria-hidden="true">←</span>
+          <span className="eyebrow">Pull request #{pullRequest.number}</span>
         </Link>
-        <p className="eyebrow">Pull request #{pullRequest.number}</p>
         <div className="detail-actions">
-          <PinButton number={pullRequest.number} />
+          <PinButton number={pullRequest.number} iconOnly={false} />
           <RefreshButton repository={details.repository} number={details.number} />
           <TopReviewMenu details={details} files={diff?.files ?? []} />
           <PRHotkeys key={`${details.repository}:${number}`} stack={getPullRequestStack(details, stackPRs)} link={details.link} repository={details.repository} number={details.number} onAssigned={(result) => setAssignment({ source: prDetails[number], assignees: result.assignees, until: Date.now() + 60000 })} onReviewerRequested={(result) => setRequestedReviewers({ source: prDetails[number], reviewRequests: result.reviewRequests, until: Date.now() + 60000 })} />

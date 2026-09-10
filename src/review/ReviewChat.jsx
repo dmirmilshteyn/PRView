@@ -15,6 +15,7 @@ export default function ReviewChat({ repository, number, children }) {
   const [error, setError] = useState(null);
   const [retry, setRetry] = useState(0);
   const messagesRef = useRef(null);
+  const composerRef = useRef(null);
   const follow = useRef(true);
   const pendingRequest = useRef(null);
   const sendingRef = useRef(false);
@@ -70,6 +71,12 @@ export default function ReviewChat({ repository, number, children }) {
     setAttachments(value);
   }
 
+  useEffect(() => {
+    if (open && attachments.length > 0) {
+      composerRef.current?.focus({ preventScroll: true });
+    }
+  }, [open, attachments]);
+
   function attach(note) {
     setOpen(true);
     try {
@@ -124,6 +131,9 @@ export default function ReviewChat({ repository, number, children }) {
 
   return <ChatAttachmentsContext.Provider value={{ attach, attachments }}><div className={`pr-chat-layout ${open ? "chat-open" : ""}`}>
     <div className="pr-chat-main">{children}</div>
+    <button className="scroll-to-top" type="button" title="Scroll to top" aria-label="Scroll to top" onClick={() => window.scrollTo({ top: 0, left: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" })}>
+      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 4h14M12 20V8m-6 6 6-6 6 6" /></svg>
+    </button>
     {!open && <div className="chat-rail"><button className="chat-launcher" type="button" title="Open review chat" aria-label="Open review chat" onClick={() => setOpen(true)} aria-expanded={false} aria-controls="review-chat">
       <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20 15a3 3 0 0 1-3 3H9l-5 3V6a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v9Z" /><path d="M8 8h8M8 12h5" /></svg>
       {chat?.status === "running" && <span className="chat-running-dot" aria-label="Agent responding">●</span>}
@@ -139,7 +149,8 @@ export default function ReviewChat({ repository, number, children }) {
       </div>
       {error && <p className="chat-error" role="alert">{error} <button type="button" onClick={() => setRetry((value) => value + 1)}>Retry connection</button></p>}
       <form className="chat-compose" onSubmit={send}>
-        <ChatAttachments attachments={attachments} onRemove={sending ? null : (id) => updateAttachments(attachmentsRef.current.filter((item) => item.id !== id))} /><label className="stack-sr-only" htmlFor="review-chat-message">Message Luna</label><textarea id="review-chat-message" placeholder="Ask Luna about this PR…" value={draft} maxLength={10000} disabled={sending} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => {
+        {attachments.length > 0 && <p className="review-muted" role="status">Pending context · included when you send your message</p>}
+        <ChatAttachments attachments={attachments} onRemove={sending ? null : (id) => updateAttachments(attachmentsRef.current.filter((item) => item.id !== id))} /><label className="stack-sr-only" htmlFor="review-chat-message">Message Luna</label><textarea ref={composerRef} id="review-chat-message" placeholder="Ask Luna about this PR…" value={draft} maxLength={10000} disabled={sending} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => {
         if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
           event.preventDefault();
           event.currentTarget.form.requestSubmit();

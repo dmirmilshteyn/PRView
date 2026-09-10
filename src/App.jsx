@@ -1,15 +1,19 @@
 "use client";
 
+import { useState } from "react";
+
 import CodeTour from "./review/CodeTour.jsx";
 import ChangeStats from "./review/ChangeStats.jsx";
 import ReviewProvider from "./review/ReviewProvider.jsx";
 import PinProvider, { usePins } from "./review/PinProvider.jsx";
 import PinButton from "./review/PinButton.jsx";
 import RefreshButton from "./review/RefreshButton.jsx";
+import PRHotkeys from "./review/PRHotkeys.jsx";
+import useCIStatus from "./review/useCIStatus.js";
 import ReviewChat from "./review/ReviewChat.jsx";
 import PullRequestContext from "./review/PullRequestContext.jsx";
 import StackNavigator from "./stack/StackNavigator.jsx";
-import { getPullRequestStack } from "./stack/stack.js";
+import { getPullRequestStack, nextStackPullRequest } from "./stack/stack.js";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -76,8 +80,14 @@ function PullRequestCard({ pullRequest }) {
         </span>
       </div>
       <h3>{pullRequest.title}</h3>
+      {pullRequest.author && <p className="pr-card-author">By {pullRequest.author}</p>}
       {pullRequest.shortSummary && <p>{pullRequest.shortSummary}</p>}
-      <ChangeStats additions={pullRequest.additions} deletions={pullRequest.deletions} />
+      <div className="pr-card-footer">
+        <ChangeStats additions={pullRequest.additions} deletions={pullRequest.deletions} />
+        {pullRequest.labels?.length > 0 && <div className="labels pr-card-labels" aria-label="Labels">
+          {pullRequest.labels.map((label) => <span className="label" key={label}>{label}</span>)}
+        </div>}
+      </div>
     </Link>
     <PinButton number={pullRequest.number} />
     </div>
@@ -158,7 +168,14 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
   const pullRequest = categories
     .flatMap((category) => getCategoryItems(pullRequests, category))
     .find((item) => String(item.number) === number);
-  const details = prDetails[number];
+  const { details: ciDetails, error: ciError } = useCIStatus(prDetails[number]);
+  const [assignment, setAssignment] = useState(null);
+  const [requestedReviewers, setRequestedReviewers] = useState(null);
+  const details = ciDetails ? {
+    ...ciDetails,
+    ...(assignment?.source === prDetails[number] ? { assignees: assignment.assignees } : {}),
+    ...(requestedReviewers?.source === prDetails[number] ? { reviewRequests: requestedReviewers.reviewRequests } : {}),
+  } : ciDetails;
   const diff = prDiffs[number];
 
   if (!pullRequest || !details) {
@@ -174,9 +191,10 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
   }
 
   return (
-    <ReviewProvider key={`${details.repository}:${number}`} repository={details.repository} number={details.number}>
+    <ReviewProvider key={`${details.repository}:${number}`} repository={details.repository} number={details.number} nextPR={nextStackPullRequest(getPullRequestStack(details, stackPRs), number)}>
     <ReviewChat key={`${details.repository}:${number}`} repository={details.repository} number={details.number}>
-    <article className="pr-detail">
+    <article className="pr-detail" id="top">
+      <PRHotkeys key={`${details.repository}:${number}`} link={details.link} repository={details.repository} number={details.number} onAssigned={(result) => setAssignment({ source: prDetails[number], assignees: result.assignees })} onReviewerRequested={(result) => setRequestedReviewers({ source: prDetails[number], reviewRequests: result.reviewRequests })} />
       <div className="detail-kicker">
         <Link className="back-link" href="/pull-requests" aria-label="Back to pull requests">
           ←
@@ -192,6 +210,7 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
         <section className="pr-page-section pr-info-card" id="info" aria-labelledby="info-heading">
           <h2 className="pr-section-heading" id="info-heading">Info</h2>
           <PullRequestContext details={details} />
+          {ciError && <p className="pr-refresh-error" role="status">{ciError}</p>}
           <div className="detail-grid">
             <div className="detail-stat">
               <span>Author</span>

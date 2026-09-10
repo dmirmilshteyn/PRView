@@ -35,7 +35,9 @@ export default function ReviewWorkspace({ details, diff, revisions, active, navi
     }
     const saved = state.positions[revision];
     const frame = requestAnimationFrame(() => {
-      if (saved) {
+      if (window.location.hash === "#top") {
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      } else if (saved) {
         const element = fileElements.current.get(saved.filePath);
         if (element) {
           window.scrollTo(0, window.scrollY + element.getBoundingClientRect().top + saved.offset);

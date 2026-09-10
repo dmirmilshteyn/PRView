@@ -9,6 +9,7 @@ export default function LocalReviewComment({ review }) {
       <div className="thread-message-content">
         <div className="thread-message-meta"><strong>You</strong><CommentTime value={review.createdAt} /><span className="review-badge" title={review.revision}>Snapshot {review.revision.slice(0, 8)}</span></div>
         <span className={`review-state ${review.event === "APPROVE" ? "approved" : review.event === "REQUEST_CHANGES" ? "changes_requested" : "commented"}`}>{label}</span>
+        {review.github?.status === "submitted" ? <a href={review.github.url} target="_blank" rel="noreferrer">Submitted to GitHub ↗</a> : <span className="review-muted">{review.github?.status === "cancelled" ? "Saved locally · Returned to draft" : review.github ? "Saved locally · GitHub submission pending" : "Saved locally"}</span>}
         {review.body && <Markdown>{review.body}</Markdown>}
       </div>
     </div></div>

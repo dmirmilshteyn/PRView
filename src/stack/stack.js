@@ -66,3 +66,12 @@ export function stackEntryStatus(entry) {
   }
   return { label: "Ready", kind: "ready", description: "Ready for review" };
 }
+
+export function nextStackPullRequest(stack, currentNumber) {
+  // Display order is tip-first; review order proceeds from the base toward the tip.
+  const index = stack?.entries.findIndex((entry) => entry.number === Number(currentNumber)) ?? -1;
+  if (index < 1) {
+    return null;
+  }
+  return stack.entries.slice(0, index).reverse().find((entry) => entry.available && !["MERGED", "CLOSED"].includes(entry.state)) ?? null;
+}

@@ -6,7 +6,7 @@
   text-rendering: optimizeLegibility;
 }
 
-.pr-chat-layout { display: grid; grid-template-columns: minmax(0, 1fr); padding-right: 1.5rem; align-items: start; }
+.pr-chat-layout { --chat-panel-width: 380px; display: grid; grid-template-columns: minmax(0, 1fr); padding-right: 1.5rem; align-items: start; }
 .pr-chat-layout.chat-open { padding-right: 360px; }
 .pr-chat-main { min-width: 0; }
 .app-shell:has(.pr-chat-layout) .main-nav { padding-right: max(4rem, 5vw); }
@@ -15,7 +15,11 @@
 .chat-rail { position: fixed; top: 0; bottom: 0; right: 0; width: 48px; z-index: 30; background: #101822; border-left: 1px solid #384660; }
 .chat-launcher { position: absolute; top: 8px; right: 8px; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; }
 .chat-running-dot { position: absolute; right: -2px; top: -5px; color: #b2b4f2; font-size: 0.65rem; }
-.review-chat { position: fixed; top: 0; bottom: 0; right: 0; width: 380px; height: 100dvh; z-index: 40; display: flex; flex-direction: column; min-width: 0; border: 0; border-left: 1px solid #384660; border-radius: 0; background: #101822; overflow: hidden; }
+.review-chat { position: fixed; top: 0; bottom: 0; right: 0; width: var(--chat-panel-width); height: 100dvh; z-index: 40; display: flex; flex-direction: column; min-width: 0; border: 0; border-left: 1px solid #384660; border-radius: 0; background: #101822; overflow: hidden; }
+.scroll-to-top { position: fixed; right: calc(48px + 1rem); bottom: max(1.5rem, env(safe-area-inset-bottom)); z-index: 35; display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid #47705f; border-radius: 50%; background: #172633; color: #c5e8d8; box-shadow: 0 4px 16px #0006; cursor: pointer; }
+.chat-open > .scroll-to-top { right: calc(var(--chat-panel-width) + 1rem); }
+.scroll-to-top:hover { background: #253d36; }
+.scroll-to-top:focus-visible { outline: 2px solid #76d3b2; outline-offset: 3px; }
 .review-chat[hidden] { display: none; }
 .review-chat-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem; background: #182334; border-bottom: 1px solid #344156; }
 .review-chat-header > div { display: grid; gap: 0.3rem; }
@@ -48,10 +52,13 @@
 .chat-activity { color: #b3b7f3; font-size: 0.8rem; }
 @media (max-width: 1100px) {
   .pr-chat-layout.chat-open { padding-right: 0; }
-  .review-chat { width: min(380px, calc(100vw - 42px)); }
+  .pr-chat-layout { --chat-panel-width: min(380px, calc(100vw - 42px)); }
+}
+@media (max-width: 460px) {
+  .chat-open > .scroll-to-top { width: 32px; height: 32px; right: calc(var(--chat-panel-width) + 5px); }
 }
 
-.review-workspace button, .review-workspace select, .pr-context button, .tour-inline-comments button, .tour-inline-comments select {
+.review-workspace button, .review-workspace select, .pr-context button, .pr-context select, .tour-inline-comments button, .tour-inline-comments select {
   background: #182330;
   color: #dce8f2;
   border: 1px solid #344456;
@@ -415,7 +422,10 @@ h1 {
 .change-bar { display: inline-flex; width: 84px; height: 7px; border-radius: 3px; overflow: hidden; background: #344456; }
 .change-bar-added { background: #57bf80; }
 .change-bar-deleted { background: #e57180; }
-.pr-card > .change-stats { margin-top: 0.75rem; }
+.pr-card-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.65rem 1rem; margin-top: 0.75rem; }
+.pr-card .pr-card-author { font-size: 0.8rem; margin-bottom: 0.35rem; overflow-wrap: anywhere; }
+.pr-card-labels { margin-left: auto; justify-content: flex-end; }
+.pr-card-labels .label { padding: 0.2rem 0.55rem; overflow-wrap: anywhere; max-width: 100%; }
 
 .pr-card {
   background: rgba(19, 29, 39, 0.82);
@@ -448,6 +458,28 @@ h1 {
 .pr-refresh { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem; min-width: 0; }
 .pr-refresh-status { color: #9aabba; font-size: 0.75rem; }
 .pr-refresh-error { color: #f2af9c; font-size: 0.8rem; overflow-wrap: anywhere; }
+.pr-hotkey-toast { position: fixed; bottom: max(1.5rem, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 1000; max-width: calc(100vw - 2rem); pointer-events: none; }
+.pr-hotkey-toast span { display: block; padding: 0.75rem 1.1rem; border: 1px solid #47705f; border-radius: 0.55rem; background: #172633; color: #e8eef5; box-shadow: 0 6px 24px #0006; font-size: 0.85rem; text-align: center; }
+.pr-confirm-dialog { width: min(440px, calc(100vw - 2rem)); box-sizing: border-box; padding: 1.5rem; border: 1px solid #405463; border-radius: 0.75rem; background: #141f2a; color: #e8eef5; box-shadow: 0 16px 64px #0008; }
+.pr-confirm-dialog::backdrop { background: #0009; }
+.pr-confirm-dialog h2 { margin: 0 0 0.75rem; font-size: 1.15rem; }
+.pr-confirm-dialog p { line-height: 1.5; overflow-wrap: anywhere; }
+.pr-confirm-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; }
+.pr-confirm-actions button { display: inline-flex; align-items: center; gap: 0.75rem; border: 1px solid #405463; border-radius: 5px; padding: 0.55rem 0.85rem; background: #1b2a38; color: #e8eef5; font: inherit; font-size: 0.85rem; cursor: pointer; }
+.pr-confirm-actions .pr-confirm-primary { background: #215742; border-color: #477d64; }
+.pr-confirm-actions button:focus-visible { outline: 2px solid #76d3b2; outline-offset: 3px; }
+.pr-confirm-actions button:disabled { opacity: 0.55; cursor: wait; }
+.pr-confirm-actions kbd { font: inherit; font-size: 1rem; opacity: 0.75; }
+.reviewer-dialog { width: min(480px, calc(100vw - 2rem)); }
+.reviewer-search { box-sizing: border-box; width: 100%; border: 1px solid #405463; border-radius: 6px; background: #0d161f; color: #e8eef5; padding: 0.75rem; font: inherit; }
+.reviewer-search:focus { outline: 2px solid #76d3b2; outline-offset: 1px; }
+.reviewer-suggestions { max-height: min(280px, 35dvh); overflow-y: auto; border: 1px solid #344456; border-top: 0; border-radius: 0 0 6px 6px; }
+.reviewer-suggestions:empty { border: 0; }
+.reviewer-option { display: flex; align-items: center; gap: 0.7rem; padding: 0.65rem 0.75rem; cursor: pointer; font-size: 0.85rem; }
+.reviewer-option.selected { background: #253d4a; }
+.reviewer-option strong { overflow-wrap: anywhere; }
+.reviewer-avatar { display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; background: #365846; color: #d7eee1; }
+.reviewer-add { margin-left: auto; color: #96bda8; }
 .pin-error { color: #f0b29b; padding: 1rem; border: 1px solid #794a3c; border-radius: 6px; }
 
 .pr-number {

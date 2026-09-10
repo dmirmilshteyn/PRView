@@ -1,9 +1,26 @@
 import { expect, test } from "bun:test";
-import { getPullRequestStack, hasPullRequestApproval, pullRequestCI, stackEntryStatus } from "../src/stack/stack.js";
+import { getPullRequestStack, hasPullRequestApproval, nextStackPullRequest, pullRequestCI, stackEntryStatus } from "../src/stack/stack.js";
 
 function pr(number, branch, baseBranch) {
   return { number, branch, baseBranch, repository: "owner/repo", title: `PR ${number}`, draft: false };
 }
+
+test("approval advances from base toward tip without wrapping or selecting unavailable PRs", () => {
+  const stack = { entries: [
+    { number: 7, available: true, state: "OPEN" },
+    { number: 3, available: true, state: "OPEN" },
+    { number: 9, available: true, state: "OPEN" },
+  ] };
+  expect(nextStackPullRequest(stack, "9")?.number).toBe(3);
+  expect(nextStackPullRequest(stack, 3)?.number).toBe(7);
+  expect(nextStackPullRequest(stack, 7)).toBeNull();
+  expect(nextStackPullRequest(stack, 42)).toBeNull();
+  expect(nextStackPullRequest(null, 9)).toBeNull();
+  for (const entry of [{ available: false, state: "OPEN" }, { available: true, state: "MERGED" }, { available: true, state: "CLOSED" }]) {
+    stack.entries[1] = { number: 3, ...entry };
+    expect(nextStackPullRequest(stack, 9)?.number).toBe(7);
+  }
+});
 
 test("CI requires checks and distinguishes pending, failing and successful rollups", () => {
   expect(pullRequestCI({})).toBe("none");

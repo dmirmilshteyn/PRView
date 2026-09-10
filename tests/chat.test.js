@@ -4,13 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { chatKey, createChatStore } from "../lib/chat-store.js";
-import { createChatService, reviewChatMetadata } from "../lib/chat-service.js";
+import { createChatService, createChatServiceWithRuntime, reviewChatMetadata } from "../lib/chat-service.js";
 import { validateChatAttachments } from "../lib/chat-attachments.js";
 
-test("comment attachments preserve code ranges in the prompt and saved session", async () => {
+test("code selections with and without comments preserve ranges in the prompt and saved session", async () => {
   const disk = await store();
   const key = chatKey("owner/repo", 1);
-  const attachments = ["LEFT", "RIGHT"].map((side) => ({ id: randomUUID(), filePath: "src/parser.js", revision: "head", body: `Question about ${side}`, anchor: { side, start: 4, end: 6, excerpt: "const value = parse(input);\nreturn value;", revision: side === "LEFT" ? "base" : "head" } }));
+  const attachments = ["LEFT", "RIGHT"].map((side) => ({ id: randomUUID(), filePath: "src/parser.js", revision: "head", body: side === "LEFT" ? `Question about ${side}` : "", anchor: { side, start: 4, end: 6, excerpt: "const value = parse(input);\nreturn value;", revision: side === "LEFT" ? "base" : "head" } }));
   const prompts = [];
   const runner = async ({ prompt, onEvent }) => {
     prompts.push(prompt);
@@ -28,9 +28,10 @@ test("comment attachments preserve code ranges in the prompt and saved session",
   await service.send(key, "Follow up", randomUUID(), "context", "head", "/tmp", []);
   expect((await finish(service, key)).messages[2].attachments).toEqual([]);
   expect(() => validateChatAttachments([{ ...attachments[0], anchor: { ...attachments[0].anchor, end: 1 } }])).toThrow("range");
-  expect(() => validateChatAttachments(Array(21).fill(attachments[0]))).toThrow("20 comments");
+  expect(() => validateChatAttachments(Array(21).fill(attachments[0]))).toThrow("20 code selections or comments");
   expect(() => validateChatAttachments([{ ...attachments[0], body: "x".repeat(80001) }])).toThrow("80,000");
-  expect(() => validateChatAttachments([{ ...attachments[0], body: "" }])).toThrow("comment");
+  expect(validateChatAttachments([{ ...attachments[0], body: "" }])).toEqual([{ ...attachments[0], body: "" }]);
+  expect(() => validateChatAttachments([{ ...attachments[0], body: null }])).toThrow("comment text");
 });
 
 test("chat context keeps code discussion without check or reviewer status", () => {
@@ -122,4 +123,32 @@ test("failed and interrupted turns preserve the session and surface errors", asy
   expect((await createChatService(disk, async () => {}).get(key)).error).toContain("interrupted");
   expect(() => chatKey("../repo", 1)).toThrow();
   await expect(service.send(key, " ", randomUUID(), "context", "a", "/tmp", [])).rejects.toThrow("message");
+});
+
+test("reloaded chat services preserve active turns and accept code-only attachments with fresh handling", async () => {
+  const disk = await store();
+  const active = new Set();
+  const key = chatKey("owner/repo", 1);
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const original = createChatServiceWithRuntime(disk, async ({ onEvent }) => {
+    await gate;
+    await onEvent({ type: "item.completed", item: { type: "agent_message", text: "First answer" } });
+  }, active);
+  await original.send(key, "First question", randomUUID(), "context", "head", "/tmp", []);
+  let newRunnerCalled = false;
+  const reloaded = createChatServiceWithRuntime(disk, async ({ onEvent }) => {
+    newRunnerCalled = true;
+    await onEvent({ type: "item.completed", item: { type: "agent_message", text: "Code explained" } });
+  }, active);
+  expect((await reloaded.get(key)).status).toBe("running");
+  await expect(reloaded.send(key, "Another question", randomUUID(), "context", "head", "/tmp", [])).rejects.toThrow("already responding");
+  release();
+  await finish(reloaded, key);
+  const attachments = [{ id: randomUUID(), filePath: "src/styles.css", body: "", revision: "head", anchor: { side: "RIGHT", start: 462, end: 471, excerpt: ".example {}", revision: "head" } }];
+  await reloaded.send(key, "What uses this?", randomUUID(), "context", "head", "/tmp", attachments);
+  const saved = await finish(reloaded, key);
+  expect(newRunnerCalled).toBe(true);
+  expect(saved.messages[2].attachments).toEqual(attachments);
+  expect(saved.messages[3].text).toBe("Code explained");
 });

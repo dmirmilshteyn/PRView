@@ -54,7 +54,7 @@ export default function NoteThreads({ filePath, revision, notes, draft, onDraft,
         <option value="info">Info</option><option value="question">Question</option><option value="warning">Warning</option><option value="blocking">Blocking</option>
       </select></label>
       <textarea ref={inputRef} aria-label={`Comment on ${filePath}`} placeholder="Write a comment (Markdown supported)…" value={draft.body} onChange={(event) => onDraft({ ...draft, body: event.target.value })} />
-      <div className="comment-submit-row">{draft.anchor && chat && <button type="button" disabled={!draft.body.trim()} onClick={() => {
+      <div className="comment-submit-row">{draft.anchor && chat && <button type="button" onClick={() => {
         if (chat.attach({ id: crypto.randomUUID(), filePath, revision, body: draft.body.trim(), anchor: draft.anchor })) {
           onCancel();
         }

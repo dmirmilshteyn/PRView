@@ -1,15 +1,21 @@
 import path from "node:path";
 import { readFile } from "node:fs/promises";
 import { chatKey, createChatStore } from "../../../lib/chat-store.js";
-import { createChatService, reviewChatMetadata } from "../../../lib/chat-service.js";
+import { createChatServiceWithRuntime, reviewChatMetadata } from "../../../lib/chat-service.js";
 import { runCodex } from "../../../lib/codex-chat.js";
 import { readReview } from "../../../lib/review-store.js";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const serviceKey = Symbol.for("prview.chat-service");
-const service = globalThis[serviceKey] ??= createChatService(createChatStore(path.join(process.cwd(), ".pr-chats")), runCodex);
+// Keep in-flight state across hot reloads, but recreate the service so its
+// validation and request handling always use the current code.
+const runtimeKey = Symbol.for("prview.chat-runtime");
+const chatRuntime = globalThis[runtimeKey] ??= {
+  store: createChatStore(path.join(process.cwd(), ".pr-chats")),
+  active: new Set(),
+};
+const service = createChatServiceWithRuntime(chatRuntime.store, runCodex, chatRuntime.active);
 
 async function pullRequest(repository, number) {
   const key = chatKey(repository, number);

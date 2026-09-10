@@ -51,10 +51,15 @@ export function useReview(repository, number) {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ repository, number, operation }), keepalive: true,
         });
+        const result = await response.json();
         if (!response.ok) {
-          throw new Error((await response.json()).error);
+          if (result.state) {
+            setState(queue.current.reduce(applyOperation, result.state));
+          }
+          throw new Error(result.error);
         }
         queue.current.shift();
+        setState(queue.current.reduce(applyOperation, result));
       }
       setStatus("Saved");
     } catch (failure) {
@@ -66,6 +71,10 @@ export function useReview(repository, number) {
   }
 
   function update(operation) {
+    if (operation.type === "cancelReview") {
+      // An explicitly abandoned submission must not run ahead of its cancellation on retry.
+      queue.current = queue.current.filter((item) => !(item.type === "finalReview" && item.review.id === operation.id));
+    }
     setState((current) => applyOperation(current, operation));
     // Coalesce typing/scroll events while a previous operation is being saved.
     const last = queue.current.at(-1);

@@ -1,4 +1,5 @@
 import Markdown from "./Markdown.jsx";
+import AutoMergeToggle from "./AutoMergeToggle.jsx";
 import GitHubMessage from "./GitHubMessage.jsx";
 import GitHubLink from "./GitHubLink.jsx";
 import LocalReviewComment from "./LocalReviewComment.jsx";
@@ -11,6 +12,7 @@ export default function PullRequestContext({ details }) {
     <div className="context-heading"><h2>Description</h2><GitHubLink href={details.link} label="Open pull request in GitHub" /></div>
     <Markdown>{details.body ?? details.description}</Markdown>
     {details.body === undefined && <p className="review-muted">Sync this PR again to import its full description and GitHub discussions.</p>}
+    <AutoMergeToggle key={`${details.repository}:${details.number}`} repository={details.repository} number={details.number} syncedAt={details.syncedAt} />
     <h2>Reviewers</h2>
     <p>{details.reviewers?.join(", ") || "No reviewers"}</p>
     <p>Requested: {details.reviewRequests?.map((actor) => actor.login || actor.name || actor.slug).join(", ") || "None recorded"}</p>

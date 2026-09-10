@@ -52,7 +52,7 @@ export default function RefreshButton({ repository, number }) {
 
   const busy = refreshing || pending;
   return <div className="pr-refresh">
-    <button className="pr-pin" type="button" title="Sync the latest comments, discussions, reviews, and CI status from GitHub" onClick={refresh} disabled={busy} aria-busy={busy}>
+    <button className="pr-pin" type="button" title="Sync the latest comments, discussions, reviews, CI status, and auto-merge status from GitHub" onClick={refresh} disabled={busy} aria-busy={busy}>
       <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7v5h-5M4 17v-5h5" /><path d="M6.1 6.1A8 8 0 0 1 20 12M4 12a8 8 0 0 0 13.9 5.9" /></svg>
       {busy ? "Refreshing…" : "Refresh"}
     </button>

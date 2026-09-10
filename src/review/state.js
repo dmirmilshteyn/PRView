@@ -9,6 +9,10 @@ export function draftKey(revision, filePath) {
 export function applyOperation(state, operation) {
   const next = structuredClone(state);
   switch (operation.type) {
+    case "cancelReview": {
+      // Wait for GitHub before restoring the draft; there is no optimistic change.
+      break;
+    }
     case "pin": {
       next.pinned = operation.value;
       break;

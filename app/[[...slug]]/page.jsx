@@ -40,6 +40,8 @@ async function loadReviewData(number) {
     pr.deletions = details.deletions;
     pr.author = details.author;
     pr.labels = details.labels ?? [];
+    pr.ci = pullRequestCI(details);
+    pr.mergeConflict = hasMergeConflict(details);
     const review = await readReview(path.join(process.cwd(), ".local-reviews"), details.repository, details.number);
     return { number: details.number, repository: details.repository, revision: details.revision, mergeConflict: hasMergeConflict(details), reviewProgress: stackReviewProgress(review, details.revision), approved: hasPullRequestApproval(details), ci: pullRequestCI(details), pinned: review.pinned === true };
   }))).filter(Boolean);

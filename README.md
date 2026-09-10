@@ -78,6 +78,12 @@ Imported snapshots live in `artifacts/history/OWNER/REPO/NUMBER/COMMIT.json`. Pe
 
 The active dashboard displays one imported repository at a time. Local review state and historical snapshots are isolated by repository and PR number. Existing artifacts without commit/content data still display their imported patches; sync again for full context, and capture at least two revisions to compare changes over time. Legacy file comments in `artifacts/comments.json` are preserved and displayed separately because they did not record a repository or commit.
 
+Use **Restart** in the PR chat header to start a fresh conversation. It archives the old transcript under `.pr-chats/history/<repository-hash>/<PR>/<restart-id>.json`, clears the active session, and preserves your unsent message and attachments. Restart is disabled while Luna is responding; interrupted sessions can be restarted. The next message starts a new session with the current PR context.
+
+The PR sidebar switches between **Chat** and **Threads**. Threads lists unresolved GitHub file/line discussions, including outdated ones, with reply and resolve actions. It shares the imported discussion and adds no polling. Adding code to chat switches back to Chat while retaining the draft. The top-right **Review…** dropdown opens the same saved review draft and GitHub submission preview as the bottom review form.
+
+Press **M** in Code or Tour to mark the current file/section reviewed, collapse it, and advance to the next unreviewed item (wrapping if needed). Tour advancement waits for the save to succeed. **[** and **]** move to the previous/next available open PR in the stack, starting at the top. Shortcuts pause in editors and dialogs. Every dashboard group, including Pinned, has independent search, author, label, CI and conflict filters using saved data only.
+
 ## Verification
 
 Run inside the devcontainer:

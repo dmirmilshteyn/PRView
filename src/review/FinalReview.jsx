@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLocalReview } from "./ReviewProvider.jsx";
 import ReviewSubmissionPreview from "./ReviewSubmissionPreview.jsx";
 
 export default function FinalReview({ revision, currentRevision, reviewedCount, fileCount }) {
+  const formId = useId();
   const { state, status, error, update, retry, nextPR, repository, number } = useLocalReview();
   const router = useRouter();
   const navigated = useRef(null);
@@ -40,18 +41,18 @@ export default function FinalReview({ revision, currentRevision, reviewedCount, 
     setPreviewReview({ id: crypto.randomUUID(), revision, event: draft.event, body: draft.body.trim(), source: "local", createdAt: new Date().toISOString() });
   }
 
-  return <form className="final-review" aria-labelledby="final-review-heading" onSubmit={submit}>
+  return <form className="final-review" aria-labelledby={`${formId}-heading`} onSubmit={submit}>
     {previewReview && <ReviewSubmissionPreview repository={repository} number={number} review={previewReview} onClose={() => setPreviewReview(null)} onConfirm={(previewToken) => {
       update({ type: "finalReview", review: previewReview, previewToken });
       setSubmittedId(previewReview.id);
       setPreviewReview(null);
     }} />}
-    <div className="context-heading"><h2 id="final-review-heading">Finish your review</h2><span className="review-muted">{reviewedCount} of {fileCount} files reviewed</span></div>
+    <div className="context-heading"><h2 id={`${formId}-heading`}>Finish your review</h2><span className="review-muted">{reviewedCount} of {fileCount} files reviewed</span></div>
     <p className="review-muted">Save locally and submit to GitHub, including saved, unresolved file and line comments that have not been submitted yet.</p>
     {revision !== currentRevision && <p className="revision-warning">Reviewing an earlier snapshot: {revision.slice(0, 8)}.</p>}
     <fieldset className="final-review-options" disabled={status !== "Saved" || Boolean(pendingReview)}><legend className="stack-sr-only">Review action</legend>
       {options.map((option) => <label key={option.event} className={`final-review-option ${option.event.toLowerCase()} ${draft.event === option.event ? "selected" : ""}`}>
-        <input type="radio" name="review-action" value={option.event} checked={draft.event === option.event} onChange={() => changeDraft({ ...draft, event: option.event })} />
+        <input type="radio" name={`${formId}-action`} value={option.event} checked={draft.event === option.event} onChange={() => changeDraft({ ...draft, event: option.event })} />
         <span className="final-review-icon" aria-hidden="true">{option.icon}</span><span><strong>{option.label}</strong><small>{option.description}</small></span>
       </label>)}
     </fieldset>

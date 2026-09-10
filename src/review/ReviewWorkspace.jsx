@@ -6,6 +6,7 @@ import { changesSinceReview, lastSubmittedReview } from "./review-changes.js";
 import DiffFile from "./DiffFile.jsx";
 import NoteThreads, { newDraft } from "./NoteThreads.jsx";
 import Markdown from "./Markdown.jsx";
+import { nextUnreviewedIndex, ignoresReviewShortcut } from "./review-navigation.js";
 
 export default function ReviewWorkspace({ details, diff, revisions, active, navigationTarget }) {
   const { state, ready, status, error, update, retry } = useLocalReview();
@@ -116,6 +117,18 @@ export default function ReviewWorkspace({ details, diff, revisions, active, navi
       goTo(next.path);
     }
   }
+  function reviewAndAdvance() {
+    const index = Math.max(0, visibleFiles.findIndex((file) => file.path === selectedFile));
+    const file = visibleFiles[index];
+    if (!file) {
+      return;
+    }
+    update({ type: "reviewed", filePath: file.path, revision, fingerprint: file.fingerprint ?? "unavailable", value: true });
+    const next = nextUnreviewedIndex(visibleFiles.map((item) => item.path), index, new Set(visibleFiles.filter(isReviewed).map((item) => item.path)));
+    if (next !== null) {
+      requestAnimationFrame(() => goTo(visibleFiles[next].path));
+    }
+  }
 
   function preference(key, value) {
     update({ type: "preferences", preferences: { [key]: value } });
@@ -160,12 +173,16 @@ export default function ReviewWorkspace({ details, diff, revisions, active, navi
 
   useEffect(() => {
     function onKeyDown(event) {
-      if (!active || !ready || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.target.closest("input, textarea, select, [contenteditable=true]")) {
+      if (!active || !ready || ignoresReviewShortcut(event) || document.querySelector("dialog[open]")) {
         return;
       }
       if (event.key.toLowerCase() === "n") {
         event.preventDefault();
         nextUnreviewed();
+      }
+      if (event.key.toLowerCase() === "m") {
+        event.preventDefault();
+        reviewAndAdvance();
       }
     }
     window.addEventListener("keydown", onKeyDown);
@@ -182,6 +199,7 @@ export default function ReviewWorkspace({ details, diff, revisions, active, navi
       {error && <p role="alert">Your changes have not been saved: {error} <button onClick={retry}>Retry saving</button></p>}
       <div className="review-options">
         <button type="button" aria-keyshortcuts="N" title="Next unreviewed file (N)" onClick={nextUnreviewed} disabled={!visibleFiles.some((file) => !isReviewed(file))}>Next unreviewed file</button>
+        <button type="button" aria-keyshortcuts="M" title="Mark reviewed and go to the next unreviewed file (M)" onClick={reviewAndAdvance} disabled={!visibleFiles.length}>Reviewed & next</button>
         <label><input type="checkbox" checked={state.preferences.split ?? false} onChange={(event) => preference("split", event.target.checked)} /> Split view</label>
         <label><input type="checkbox" checked={state.preferences.ignoreWhitespace ?? false} onChange={(event) => preference("ignoreWhitespace", event.target.checked)} /> Ignore whitespace</label>
         <label><input type="checkbox" checked={sinceReview} disabled={!baseline} onChange={(event) => { setSelection({}); preference("sinceReview", event.target.checked); }} /> {lastReview?.revision === baselineRevision ? "Changes since last review" : "Changes since baseline"}</label>

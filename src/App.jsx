@@ -15,6 +15,8 @@ import PullRequestContext from "./review/PullRequestContext.jsx";
 import StackNavigator from "./stack/StackNavigator.jsx";
 import PRStatusBadge from "./stack/PRStatusBadge.jsx";
 import MergeReadiness from "./review/MergeReadiness.jsx";
+import TopReviewMenu from "./review/TopReviewMenu.jsx";
+import { filterPullRequests } from "./dashboard-filters.js";
 import { hasMergeConflict } from "./stack/stack.js";
 import { getPullRequestStack, nextStackPullRequest } from "./stack/stack.js";
 import Link from "next/link";
@@ -96,36 +98,39 @@ function PullRequestCard({ pullRequest }) {
   );
 }
 
+function DashboardGroup({ label, accent, items, emptyMessage }) {
+  const [filters, setFilters] = useState({ query: "", author: "", label: "", ci: "", conflicts: false });
+  const visible = filterPullRequests(items, filters);
+  const authors = [...new Set(items.map((pr) => pr.author).filter(Boolean))].sort();
+  const labels = [...new Set(items.flatMap((pr) => pr.labels ?? []))].sort();
+  function change(key, value) {
+    setFilters((current) => ({ ...current, [key]: value }));
+  }
+  return <section className="pr-group" aria-label={label}>
+    <div className="group-heading"><div className="group-title"><span className={`status-dot ${accent}`} /><h2>{label}</h2><span className="count">{visible.length === items.length ? items.length : `${visible.length}/${items.length}`}</span></div>
+      {items.length > 0 && <div className="dashboard-filters">
+        <input type="search" aria-label={`Search ${label}`} placeholder="Title, author, or #" value={filters.query} onChange={(event) => change("query", event.target.value)} />
+        <select aria-label={`Author in ${label}`} value={filters.author} onChange={(event) => change("author", event.target.value)}><option value="">All authors</option>{authors.map((author) => <option key={author}>{author}</option>)}</select>
+        <select aria-label={`Label in ${label}`} value={filters.label} onChange={(event) => change("label", event.target.value)}><option value="">All labels</option>{labels.map((value) => <option key={value}>{value}</option>)}</select>
+        <select aria-label={`CI in ${label}`} value={filters.ci} onChange={(event) => change("ci", event.target.value)}><option value="">All CI</option><option value="failure">Failed</option><option value="pending">Pending</option><option value="success">Passed</option><option value="none">No checks</option></select>
+        <label><input type="checkbox" checked={filters.conflicts} onChange={(event) => change("conflicts", event.target.checked)} /> Conflicts</label>
+        <button className="pr-pin dashboard-filters-clear" type="button" disabled={!Object.values(filters).some(Boolean)} onClick={() => setFilters({ query: "", author: "", label: "", ci: "", conflicts: false })}>Clear</button>
+      </div>}
+    </div>
+    <div className="pr-list">{visible.length ? visible.map((pr) => <PullRequestCard key={pr.number} pullRequest={pr} />) : <p className="empty-state">{items.length ? "No PRs match these filters." : emptyMessage}</p>}</div>
+  </section>;
+}
+
 function PullRequestGroups({ pullRequests }) {
   const { pins } = usePins();
   const pinned = categories.flatMap((category) => getCategoryItems(pullRequests, category)).filter((pr) => pins.has(pr.number));
   return (
     <div className="pr-groups">
-      <section className="pr-group pinned-prs" aria-labelledby="pinned-heading">
-        <div className="group-heading"><div className="group-title"><span className="status-dot amber" /><h2 id="pinned-heading">Pinned</h2><span className="count">{pinned.length}</span></div></div>
-        <div className="pr-list">{pinned.length ? pinned.map((pr) => <PullRequestCard key={pr.number} pullRequest={pr} />) : <p className="empty-state">Pin a pull request to keep it here.</p>}</div>
-      </section>
+      <DashboardGroup label="Pinned" accent="amber" items={pinned} emptyMessage="Pin a pull request to keep it here." />
       {categories.map((category) => {
         const items = getCategoryItems(pullRequests, category).filter((pr) => !pins.has(pr.number));
 
-        return (
-          <section className="pr-group" key={category.key}>
-            <div className="group-heading">
-              <div className="group-title">
-                <span className={`status-dot ${category.accent}`} />
-                <h2>{category.label}</h2>
-                <span className="count">{items.length}</span>
-              </div>
-            </div>
-            <div className="pr-list">
-              {items.length > 0 ? (
-                items.map((pullRequest) => <PullRequestCard key={pullRequest.number} pullRequest={pullRequest} />)
-              ) : (
-                <p className="empty-state">No pull requests in this group.</p>
-              )}
-            </div>
-          </section>
-        );
+        return <DashboardGroup key={category.key} label={category.label} accent={category.accent} items={items} emptyMessage="No pull requests in this group." />;
       })}
     </div>
   );
@@ -181,6 +186,17 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
     ...(requestedReviewers?.source === prDetails[number] && Date.now() < requestedReviewers.until ? { reviewRequests: requestedReviewers.reviewRequests } : {}),
   } : ciDetails;
   const diff = prDiffs[number];
+  function onThreadUpdated(result) {
+    setDiscussion((previous) => {
+      const github = (previous?.source === prDetails[number] ? previous.github : prDetails[number].github) ?? { comments: [], reviews: [], inlineComments: [], threads: [] };
+      return { source: prDetails[number], github: {
+        ...github,
+        comments: result.discussionComment ? [...(github.comments ?? []).filter((comment) => comment.id !== result.discussionComment.id), result.discussionComment] : github.comments,
+        inlineComments: result.comment ? [...(github.inlineComments ?? []).filter((comment) => comment.id !== result.comment.id), result.comment] : github.inlineComments,
+        threads: result.thread ? (github.threads ?? []).map((thread) => thread.id === result.thread.id ? { ...thread, ...result.thread } : thread) : github.threads,
+      } };
+    });
+  }
 
   if (!pullRequest || !details) {
     return (
@@ -196,7 +212,7 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
 
   return (
     <ReviewProvider key={`${details.repository}:${number}`} repository={details.repository} number={details.number} nextPR={nextStackPullRequest(getPullRequestStack(details, stackPRs), number)}>
-    <ReviewChat key={`${details.repository}:${number}`} repository={details.repository} number={details.number}>
+    <ReviewChat key={`${details.repository}:${number}`} repository={details.repository} number={details.number} details={details} onThreadUpdated={onThreadUpdated}>
     <article className="pr-detail" id="top">
       <div className="detail-kicker">
         <Link className="back-link" href="/pull-requests" aria-label="Back to pull requests">
@@ -206,7 +222,8 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
         <div className="detail-actions">
           <PinButton number={pullRequest.number} />
           <RefreshButton repository={details.repository} number={details.number} />
-          <PRHotkeys key={`${details.repository}:${number}`} link={details.link} repository={details.repository} number={details.number} onAssigned={(result) => setAssignment({ source: prDetails[number], assignees: result.assignees, until: Date.now() + 60000 })} onReviewerRequested={(result) => setRequestedReviewers({ source: prDetails[number], reviewRequests: result.reviewRequests, until: Date.now() + 60000 })} />
+          <TopReviewMenu details={details} files={diff?.files ?? []} />
+          <PRHotkeys key={`${details.repository}:${number}`} stack={getPullRequestStack(details, stackPRs)} link={details.link} repository={details.repository} number={details.number} onAssigned={(result) => setAssignment({ source: prDetails[number], assignees: result.assignees, until: Date.now() + 60000 })} onReviewerRequested={(result) => setRequestedReviewers({ source: prDetails[number], reviewRequests: result.reviewRequests, until: Date.now() + 60000 })} />
         </div>
       </div>
       <h1>{details.title}</h1>
@@ -222,15 +239,7 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
       <MergeReadiness details={details} />
         <section className="pr-page-section pr-info-card" id="info" aria-labelledby="info-heading">
           <h2 className="pr-section-heading" id="info-heading">Info</h2>
-          <PullRequestContext details={details} onThreadUpdated={(result) => setDiscussion((previous) => {
-            const github = (previous?.source === prDetails[number] ? previous.github : prDetails[number].github) ?? { comments: [], reviews: [], inlineComments: [], threads: [] };
-            return { source: prDetails[number], github: {
-              ...github,
-              comments: result.discussionComment ? [...(github.comments ?? []).filter((comment) => comment.id !== result.discussionComment.id), result.discussionComment] : github.comments,
-              inlineComments: result.comment ? [...(github.inlineComments ?? []).filter((comment) => comment.id !== result.comment.id), result.comment] : github.inlineComments,
-              threads: result.thread ? (github.threads ?? []).map((thread) => thread.id === result.thread.id ? { ...thread, ...result.thread } : thread) : github.threads,
-            } };
-          })} >
+          <PullRequestContext details={details} onThreadUpdated={onThreadUpdated}>
           <div className="pr-info-metadata">
           {ciError && <p className="pr-refresh-error" role="status">{ciError}</p>}
           <div className="detail-grid">

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Markdown from "./Markdown.jsx";
 import CommentTime from "./CommentTime.jsx";
 import TourCode from "./TourCode.jsx";
+import { nextUnreviewedIndex, ignoresReviewShortcut } from "./review-navigation.js";
 
 function TourList({ items, empty }) {
   return items.length ? <ul>{items.map((item, index) => <li key={index}><Markdown>{item}</Markdown></li>)}</ul> : <p className="review-muted">{empty}</p>;
@@ -174,7 +175,7 @@ export default function ReviewTour({ details, fileCount, active, onOpenCode }) {
     section?.querySelector("summary")?.focus({ preventScroll: true });
     section?.scrollIntoView({ block: "start" });
   }
-  async function markReviewed(section, reviewed) {
+  async function markReviewed(section, reviewed, advance) {
     if (!state?.fingerprint || pendingSections.current.has(section)) {
       return;
     }
@@ -195,6 +196,16 @@ export default function ReviewTour({ details, fileCount, active, onOpenCode }) {
       if (!response.ok) {
         throw new Error(result.error || "Could not save review progress");
       }
+      if (reviewed && result.reviewedSections[section]) {
+        const element = sectionElements.current[sectionKeys.indexOf(section)];
+        if (element) {
+          const hadFocus = element.contains(document.activeElement);
+          element.open = false;
+          if (hadFocus) {
+            element.querySelector("summary")?.focus();
+          }
+        }
+      }
       setState((current) => {
         if (current?.fingerprint !== fingerprint) {
           return current;
@@ -207,6 +218,12 @@ export default function ReviewTour({ details, fileCount, active, onOpenCode }) {
         }
         return { ...current, reviewedSections };
       });
+      if (advance) {
+        const next = nextUnreviewedIndex(sectionKeys, sectionKeys.indexOf(section), new Set(Object.keys(result.reviewedSections).filter((key) => result.reviewedSections[key])));
+        if (next !== null) {
+          requestAnimationFrame(() => navigate(next));
+        }
+      }
     } catch (failure) {
       setSaveError(`Could not save section progress: ${failure.message}. Try the checkbox again.`);
     } finally {
@@ -215,6 +232,18 @@ export default function ReviewTour({ details, fileCount, active, onOpenCode }) {
       setSaving(new Set(pendingSections.current));
     }
   }
+
+  useEffect(() => {
+    function onKeyDown(event) {
+      if (!active || state?.status !== "ready" || ignoresReviewShortcut(event) || document.querySelector("dialog[open]") || event.key.toLowerCase() !== "m") {
+        return;
+      }
+      event.preventDefault();
+      markReviewed(sectionKeys[selected], true, true);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
 
   function retry() {
     setState(null);
@@ -245,7 +274,10 @@ export default function ReviewTour({ details, fileCount, active, onOpenCode }) {
   const reviewedCount = sectionKeys.filter((key) => reviewedSections[key]).length;
   function reviewedControl(index) {
     const section = sectionKeys[index];
-    return <TourReviewed section={section} title={sections[index]} reviewed={Boolean(reviewedSections[section])} pending={saving.has(section)} onChange={markReviewed} />;
+    return <footer className="tour-section-footer"><TourReviewed section={section} title={sections[index]} reviewed={Boolean(reviewedSections[section])} pending={saving.has(section)} onChange={(key, value) => markReviewed(key, value, false)} /><button type="button" disabled={saving.has(section)} title="Mark reviewed and advance (M)" onClick={() => markReviewed(section, true, true)}>Reviewed & next <kbd>M</kbd></button></footer>;
+  }
+  function reviewedIndicator(index) {
+    return reviewedSections[sectionKeys[index]] ? <span className="tour-reviewed-indicator">✓ Reviewed</span> : null;
   }
   return <section className="review-workspace tour-workspace" aria-label="PR review tour">
     <div className="tour-meta"><span>Luna · snapshot {state.revision?.slice(0, 8)}</span><span>Generated <CommentTime value={state.generatedAt} /></span><span>{tour.coveredCount}/{tour.fileCount} files in the route · {tour.steps.length} review stops{mechanical.length ? ` · ${mechanical.length} mechanical groups` : ""}</span></div>
@@ -260,27 +292,31 @@ export default function ReviewTour({ details, fileCount, active, onOpenCode }) {
         </button>)}
       </aside>
       <div className="tour-content" ref={content}>
-        <details open className="tour-section" id="tour-section-0" aria-labelledby="tour-heading-0" ref={(element) => { sectionElements.current[0] = element; }}>
-          <summary className="tour-section-heading"><p className="eyebrow">The review plan</p><h3 id="tour-heading-0" tabIndex={-1}>{tour.title}</h3>{reviewedControl(0)}</summary>
+        <details open={!reviewedSections[sectionKeys[0]]} className="tour-section" id="tour-section-0" aria-labelledby="tour-heading-0" ref={(element) => { sectionElements.current[0] = element; }}>
+          <summary className="tour-section-heading"><p className="eyebrow">The review plan</p><h3 id="tour-heading-0" tabIndex={-1}>{tour.title}</h3>{reviewedIndicator(0)}</summary>
           <Markdown>{tour.overview}</Markdown>
           <div className="tour-callout"><h4>Follow the change</h4><Markdown>{tour.flow}</Markdown></div>
           <p className="review-muted">Follow the route in order or jump to a section. These are review checkpoints, not verified findings.</p>
+          {reviewedControl(0)}
         </details>
-        {tour.steps.map((stop, stopIndex) => <details open className="tour-section" id={`tour-section-${stopIndex + 1}`} aria-labelledby={`tour-heading-${stopIndex + 1}`} key={stop.id} ref={(element) => { sectionElements.current[stopIndex + 1] = element; }}>
-          <summary className="tour-section-heading"><p className="eyebrow">Stop {stopIndex + 1} of {tour.steps.length}</p><h3 id={`tour-heading-${stopIndex + 1}`} tabIndex={-1}>{sections[stopIndex + 1]}</h3>{reviewedControl(stopIndex + 1)}</summary>
+        {tour.steps.map((stop, stopIndex) => <details open={!reviewedSections[sectionKeys[stopIndex + 1]]} className="tour-section" id={`tour-section-${stopIndex + 1}`} aria-labelledby={`tour-heading-${stopIndex + 1}`} key={stop.id} ref={(element) => { sectionElements.current[stopIndex + 1] = element; }}>
+          <summary className="tour-section-heading"><p className="eyebrow">Stop {stopIndex + 1} of {tour.steps.length}</p><h3 id={`tour-heading-${stopIndex + 1}`} tabIndex={-1}>{sections[stopIndex + 1]}</h3>{reviewedIndicator(stopIndex + 1)}</summary>
           <TourStop stop={stop} onOpenCode={onOpenCode} revision={details.revision} />
+          {reviewedControl(stopIndex + 1)}
         </details>)}
         {mechanical.length > 0 && <details className="tour-section tour-mechanical" id={`tour-section-${mechanicalIndex}`} aria-labelledby="tour-mechanical-heading" ref={(element) => { sectionElements.current[mechanicalIndex] = element; }}>
-          <summary className="tour-section-heading"><p className="eyebrow">Supporting work · {mechanical.length} groups</p><h3 id="tour-mechanical-heading">Mechanical changes</h3>{reviewedControl(mechanicalIndex)}</summary>
+          <summary className="tour-section-heading"><p className="eyebrow">Supporting work · {mechanical.length} groups</p><h3 id="tour-mechanical-heading">Mechanical changes</h3>{reviewedIndicator(mechanicalIndex)}</summary>
           <p className="review-muted">Prop plumbing, repetitive wiring, and other behavior-preserving edits. Expand the code references for a quick consistency review.</p>
           {mechanical.map((stop) => <div className="tour-mechanical-group" key={stop.id}><h4>{stop.title.replace(/^\d+[.)]\s*/, "")}</h4><TourStop stop={stop} onOpenCode={onOpenCode} revision={details.revision} /></div>)}
+          {reviewedControl(mechanicalIndex)}
         </details>}
-        <details open className="tour-section" id={`tour-section-${sections.length - 1}`} aria-labelledby="tour-tests-heading" ref={(element) => { sectionElements.current[sections.length - 1] = element; }}>
-          <summary className="tour-section-heading"><p className="eyebrow">Before you finish</p><h3 id="tour-tests-heading" tabIndex={-1}>Tests & coverage</h3>{reviewedControl(sections.length - 1)}</summary>
+        <details open={!reviewedSections[sectionKeys[sections.length - 1]]} className="tour-section" id={`tour-section-${sections.length - 1}`} aria-labelledby="tour-tests-heading" ref={(element) => { sectionElements.current[sections.length - 1] = element; }}>
+          <summary className="tour-section-heading"><p className="eyebrow">Before you finish</p><h3 id="tour-tests-heading" tabIndex={-1}>Tests & coverage</h3>{reviewedIndicator(sections.length - 1)}</summary>
           <h4>Tests found in the change</h4><TourList items={tour.existingTests} empty="No existing test coverage was identified in the supplied snapshot." />
           <h4>What to verify</h4><TourList items={tour.suggestedTests} empty="No additional test scenarios were suggested." />
           <h4>Outside the guided route</h4>{tour.notCovered.length ? <ul>{tour.notCovered.map((file) => <li key={file.path}><strong>{file.path}</strong><Markdown>{file.reason}</Markdown></li>)}</ul> : <p>Every changed file is referenced by a tour stop.</p>}
           <h4>Evidence & limitations</h4><TourList items={tour.limitations} empty="Luna reported no additional limitations." /><p className="review-muted">This tour explains the supplied snapshot. It does not run tests or mark files reviewed.</p>
+          {reviewedControl(sections.length - 1)}
         </details>
       </div>
     </div>

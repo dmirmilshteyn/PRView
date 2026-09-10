@@ -3,8 +3,11 @@ import AssignSelfDialog from "./AssignSelfDialog.jsx";
 import ReviewerDialog from "./ReviewerDialog.jsx";
 import HotkeyHelp from "./HotkeyHelp.jsx";
 import { createHotkeyMatcher } from "./hotkey-matcher.js";
+import { useRouter } from "next/navigation";
+import { nextStackPullRequest, previousStackPullRequest } from "../stack/stack.js";
 
-export default function PRHotkeys({ link, repository, number, onAssigned, onReviewerRequested }) {
+export default function PRHotkeys({ link, repository, number, onAssigned, onReviewerRequested, stack }) {
+  const router = useRouter();
   const [toast, setToast] = useState(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [reviewerOpen, setReviewerOpen] = useState(false);
@@ -39,6 +42,15 @@ export default function PRHotkeys({ link, repository, number, onAssigned, onRevi
         return;
       }
       const key = event.key.toLowerCase();
+      if (key === "[" || key === "]") {
+        const target = key === "[" ? previousStackPullRequest(stack, number) : nextStackPullRequest(stack, number);
+        reset();
+        if (target) {
+          event.preventDefault();
+          router.push(`/pull-requests/${target.number}#top`, { scroll: true });
+        }
+        return;
+      }
       const action = matcher.keyDown(key, performance.now());
       if (action === "reviewer") {
         event.preventDefault();
@@ -93,7 +105,7 @@ export default function PRHotkeys({ link, repository, number, onAssigned, onRevi
       window.removeEventListener("blur", reset);
       window.removeEventListener("focusin", reset);
     };
-  }, [link]);
+  }, [link, stack, number, router]);
 
   return <>
     <button className="hotkey-help-button pr-pin" type="button" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" onClick={() => setHelpOpen(true)}>?</button>

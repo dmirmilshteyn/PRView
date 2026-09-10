@@ -23,8 +23,33 @@
 .review-chat[hidden] { display: none; }
 .review-chat-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem; background: #182334; border-bottom: 1px solid #344156; }
 .review-chat-header > div { display: grid; gap: 0.3rem; }
+.review-chat-header > .chat-header-actions { display: flex; flex-direction: row; align-items: center; flex-shrink: 0; gap: 0.25rem; padding: 0.2rem; border: 1px solid #334357; border-radius: 9px; background: #111d2b; }
+.review-chat .chat-header-icon { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border-color: transparent; border-radius: 6px; background: transparent; color: #acbfd2; transition: background 150ms ease, color 150ms ease; }
+.review-chat .chat-header-icon:hover:not(:disabled) { background: #25384b; color: #e7f1fa; }
+.review-chat .chat-header-icon[aria-busy="true"] svg { animation: tour-spin 1s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .review-chat .chat-header-icon[aria-busy="true"] svg { animation: none; } }
 .review-chat-header strong { font-size: 0.95rem; }
 .review-chat-header span { color: #a5b2c9; font-size: 0.72rem; }
+.pr-sidebar-tabs { display: flex; gap: 0.35rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid #344156; }
+.pr-sidebar-tabs button { flex: 1; padding: 0.4rem; background: transparent; border-color: transparent; }
+.pr-sidebar-tabs button[aria-pressed="true"] { color: #b5ebd7; background: #233d39; border-color: #426758; }
+.pr-sidebar-tabs span { margin-left: 0.3rem; font-variant-numeric: tabular-nums; }
+.pr-sidebar-chat { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.pr-sidebar-chat[hidden] { display: none; }
+.unresolved-threads { flex: 1; min-height: 0; overflow-y: auto; padding: 0.75rem; }
+.unresolved-threads > .discussion-thread { margin: 0.75rem 0; }
+.unresolved-threads .thread-message { padding: 0.65rem; gap: 0.5rem; }
+.unresolved-threads .thread-avatar { display: none; }
+.unresolved-threads .discussion-thread-header { overflow-wrap: anywhere; }
+.unresolved-threads a { color: #8ed4bf; }
+.top-review-menu select { padding: 0.35rem 0.65rem; background: #224d3a; border: 1px solid #47735d; border-radius: 5px; color: #e0f3e8; font: inherit; font-size: 0.8rem; cursor: pointer; }
+.dashboard-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem; margin-top: 0.65rem; font-size: 0.8rem; }
+.dashboard-filters input[type="search"], .dashboard-filters select { min-width: 0; max-width: 100%; padding: 0.4rem 0.5rem; background: #131e29; color: #d4e0ec; border: 1px solid #344656; border-radius: 5px; font: inherit; }
+.dashboard-filters input[type="search"] { flex: 1 1 160px; }
+.dashboard-filters label { display: inline-flex; align-items: center; gap: 0.4rem; }
+.dashboard-filters-clear { flex: 0 0 auto; margin-left: auto; }
+.dashboard-filters-clear:disabled { cursor: default; }
+.dashboard-filters :focus-visible, .top-review-menu select:focus-visible { outline: 2px solid #86dec0; outline-offset: 2px; }
 .chat-messages { flex: 1; min-height: 0; overflow-y: auto; padding: 1rem; overflow-wrap: anywhere; }
 .chat-empty { padding: 1rem 0; color: #a9b8cb; font-size: 0.85rem; line-height: 1.6; }
 .chat-empty strong { color: #d5dded; }
@@ -75,6 +100,63 @@
 .context-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .review-options { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin: 0.8rem 0; font-size: 0.85rem; }
 .review-options label, .review-file-header label { display: flex; align-items: center; gap: 0.4rem; }
+input[type="checkbox"]:not([role="switch"]) {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex-shrink: 0;
+  width: 1.05rem;
+  height: 1.05rem;
+  padding: 0;
+  margin: 0;
+  vertical-align: -0.15em;
+  border: 1px solid #536779;
+  border-radius: 4px;
+  background: #101a24;
+  color: #102a20;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+input[type="checkbox"]:not([role="switch"])::before {
+  content: "";
+  width: 0.55rem;
+  height: 0.3rem;
+  border: solid currentColor;
+  border-width: 0 0 2px 2px;
+  transform: translateY(-1px) rotate(-45deg);
+  visibility: hidden;
+}
+input[type="checkbox"]:not([role="switch"]):checked { background: #86dec0; border-color: #86dec0; }
+input[type="checkbox"]:not([role="switch"]):checked::before { visibility: visible; }
+input[type="checkbox"]:not([role="switch"]):hover:not(:disabled) { border-color: #a4efd4; box-shadow: 0 0 0 2px #86dec019; }
+input[type="checkbox"]:focus-visible { outline: 2px solid #86dec0; outline-offset: 3px; }
+input[type="checkbox"]:disabled { opacity: 0.45; cursor: not-allowed; }
+input[type="checkbox"][role="switch"] {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 2.2rem;
+  height: 1.25rem;
+  margin: 0;
+  padding: 2px;
+  border: 1px solid #536779;
+  border-radius: 999px;
+  background: #253340;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+input[type="checkbox"][role="switch"]::before { content: ""; width: 0.875rem; height: 0.875rem; border-radius: 50%; background: #bac9d5; transition: transform 120ms ease; }
+input[type="checkbox"][role="switch"]:checked { background: #286149; border-color: #6abb95; }
+input[type="checkbox"][role="switch"]:checked::before { transform: translateX(0.95rem); background: #c4f5df; }
+input[type="checkbox"][role="switch"]:hover:not(:disabled) { border-color: #a4efd4; }
+@media (prefers-reduced-motion: reduce) {
+  input[type="checkbox"], input[type="checkbox"]::before { transition: none !important; }
+}
+@media (forced-colors: active) {
+  input[type="checkbox"]:not([role="switch"]), input[type="checkbox"][role="switch"] { appearance: auto; background: revert; color: revert; }
+  input[type="checkbox"]::before { display: none; }
+}
 .review-muted { color: #9aabba; font-size: 0.8rem; line-height: 1.5; }
 .review-badge { border: 1px solid #405063; border-radius: 4px; padding: 0.1rem 0.35rem; font-size: 0.72rem; color: #acbccb; font-weight: normal; }
 .revision-warning { color: #f0c676; font-size: 0.8rem; }
@@ -693,6 +775,9 @@ h1 {
 .tour-section[open] > summary::before { content: "▾"; }
 .tour-section > summary:focus-visible { outline: 2px solid #86dec0; outline-offset: 5px; border-radius: 3px; }
 .tour-reviewed { display: inline-flex; align-items: center; gap: 0.4rem; color: #b5c9bd; font-size: 0.75rem; cursor: pointer; margin: 0.1rem 0 0.6rem; }
+.tour-section-footer { display: flex; align-items: center; justify-content: flex-end; gap: 1rem; flex-wrap: wrap; border-top: 1px solid #2a3a49; padding-top: 0.8rem; margin-top: 1rem; }
+.tour-section-footer .tour-reviewed { margin: 0; }
+.tour-reviewed-indicator { color: #86dec0; font-size: 0.8rem; }
 .tour-reviewed input { accent-color: #86dec0; width: 1rem; height: 1rem; margin: 0; }
 .tour-reviewed input:focus-visible { outline: 2px solid #86dec0; outline-offset: 3px; }
 .tour-stop-number.is-reviewed { color: #86dec0; opacity: 1; }

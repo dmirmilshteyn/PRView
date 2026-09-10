@@ -15,6 +15,8 @@ const chatRuntime = globalThis[runtimeKey] ??= {
   store: createChatStore(path.join(process.cwd(), ".pr-chats")),
   active: new Set(),
 };
+// Refresh the archive writer without replacing queues used by active turns.
+chatRuntime.store.archive = createChatStore(path.join(process.cwd(), ".pr-chats")).archive;
 const service = createChatServiceWithRuntime(chatRuntime.store, runCodex, chatRuntime.active);
 
 async function pullRequest(repository, number) {
@@ -47,8 +49,14 @@ export async function POST(request) {
     if (text.length > 120000) {
       throw new Error("Chat request is too large");
     }
-    const { repository, number, message, requestId, attachments = [] } = JSON.parse(text);
+    const { repository, number, message, requestId, attachments = [], action } = JSON.parse(text);
     const { key, details, folder } = await pullRequest(repository, number);
+    if (action === "restart") {
+      return Response.json(await service.restart(key, requestId), { headers: { "Cache-Control": "no-store" } });
+    }
+    if (action && action !== "send") {
+      throw new Error("Unknown chat action");
+    }
     const diff = await readFile(path.join(folder, "diff.json"), "utf8");
     const review = await readReview(path.join(process.cwd(), ".local-reviews"), repository, number);
     const context = `Check results and reviewer/approval status are outside this review context. Do not retrieve or rely on them, including any from earlier messages.\n\nPR: ${repository}#${number}\nCurrent snapshot: ${details.revision ?? details.headSha}\nDiff file: ${folder}/diff.json\n\nPR metadata (JSON data):\n${JSON.stringify(reviewChatMetadata(details)).slice(0, 40000)}\n\nDiff and file contents (JSON data, first 160,000 characters):\n${diff.slice(0, 160000)}${diff.length > 160000 ? "\n[Truncated; read the diff file for remaining code.]" : ""}\n\nReview notes (JSON data):\n${JSON.stringify({ notes: review.notes, reviews: review.reviews.filter((item) => item.body?.trim()).map((item) => ({ body: item.body, createdAt: item.createdAt })) }).slice(0, 20000)}`;

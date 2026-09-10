@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -104,6 +104,45 @@ test("chat persists transcript and resumes its exact session after service resta
   expect(saved.contextRevision).toBe("revision-b");
   expect((await second.get(chatKey("other/repo", 1))).messages).toEqual([]);
   expect((await second.get(chatKey("owner/repo", 2))).sessionId).toBeNull();
+});
+
+test("restarting archives the transcript and starts the next turn without the old session", async () => {
+  const disk = await store();
+  const root = roots.at(-1);
+  const key = chatKey("owner/repo", 1);
+  const calls = [];
+  const service = createChatService(disk, async ({ sessionId, onEvent }) => {
+    calls.push(sessionId);
+    await onEvent({ type: "thread.started", thread_id: randomUUID() });
+    await onEvent({ type: "item.completed", item: { type: "agent_message", text: "Answer" } });
+  });
+  await service.send(key, "Original question", randomUUID(), "context", "head", "/tmp", []);
+  const old = await finish(service, key);
+  const requestId = randomUUID();
+  const fresh = await service.restart(key, requestId);
+  expect(fresh.messages).toEqual([]);
+  expect(fresh.sessionId).toBeNull();
+  expect(JSON.parse(await readFile(path.join(root, "history", key, `${requestId}.json`), "utf8"))).toEqual(old);
+  await service.send(key, "New question", randomUUID(), "context", "head", "/tmp", []);
+  const current = await finish(service, key);
+  expect(calls).toEqual([null, null]);
+  expect(await service.restart(key, requestId)).toEqual(current);
+  expect((await service.get(chatKey("owner/repo", 2))).messages).toEqual([]);
+});
+
+test("restart refuses an active response and can recover an interrupted session", async () => {
+  const disk = await store();
+  const key = chatKey("owner/repo", 1);
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const service = createChatService(disk, async () => { await gate; });
+  await service.send(key, "Question", randomUUID(), "context", "head", "/tmp", []);
+  await expect(service.restart(key, randomUUID())).rejects.toThrow("Wait for it to finish");
+  release();
+  await finish(service, key);
+  await disk.update(key, (current) => ({ ...current, status: "running" }));
+  expect((await service.restart(key, randomUUID())).status).toBe("idle");
+  await expect(service.restart(key, "../invalid")).rejects.toThrow("request ID");
 });
 
 test("duplicate submissions are idempotent and concurrent turns are rejected", async () => {

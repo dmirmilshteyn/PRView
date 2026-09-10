@@ -5,14 +5,18 @@ import { ChatAttachmentsContext } from "./ChatAttachmentsContext.jsx";
 import ChatAttachments from "./ChatAttachments.jsx";
 import { validateChatAttachments } from "../../lib/chat-attachments.js";
 import { chatDraftKey, readChatDraft, writeChatDraft, clearSentChatDraft } from "./chat-draft.js";
+import UnresolvedThreads, { unresolvedThreads } from "./UnresolvedThreads.jsx";
 
-export default function ReviewChat({ repository, number, children }) {
+export default function ReviewChat({ repository, number, children, details, onThreadUpdated }) {
+  const [panel, setPanel] = useState("chat");
   const [open, setOpen] = useState(true);
   const [chat, setChat] = useState(null);
   const [draft, setDraft] = useState("");
   const [attachments, setAttachments] = useState([]);
   const attachmentsRef = useRef([]);
   const [sending, setSending] = useState(false);
+  const [restarting, setRestarting] = useState(false);
+  const restartRequest = useRef(null);
   const [error, setError] = useState(null);
   const [retry, setRetry] = useState(0);
   const [draftReady, setDraftReady] = useState(false);
@@ -63,7 +67,7 @@ export default function ReviewChat({ repository, number, children }) {
   }, []);
 
   useEffect(() => {
-    if (!open && chat?.status !== "running") {
+    if ((!open || panel !== "chat") && chat?.status !== "running") {
       return;
     }
     let cancelled = false;
@@ -105,7 +109,7 @@ export default function ReviewChat({ repository, number, children }) {
     }
     poll();
     return () => { cancelled = true; controller.abort(); clearTimeout(timer); };
-  }, [open, url, chat?.status, retry]);
+  }, [open, panel, url, chat?.status, retry]);
 
   useEffect(() => {
     if (open && follow.current && messagesRef.current) {
@@ -130,6 +134,7 @@ export default function ReviewChat({ repository, number, children }) {
       return false;
     }
     setOpen(true);
+    setPanel("chat");
     try {
       const attachment = { id: note.id, filePath: note.filePath, revision: note.revision, body: [note.body, ...(note.replies ?? []).map((reply) => `Reply: ${reply.body}`)].join("\n\n"), anchor: { ...note.anchor, revision: note.anchor?.revision ?? note.revision } };
       updateAttachments(validateChatAttachments([...attachmentsRef.current.filter((item) => item.id !== note.id), attachment]));
@@ -138,6 +143,42 @@ export default function ReviewChat({ repository, number, children }) {
     } catch (failure) {
       setError(failure.message);
       return false;
+    }
+  }
+
+  async function restart() {
+    if (!draftReady || !chat || sendingRef.current || chat.status === "running") {
+      return;
+    }
+    restartRequest.current ??= crypto.randomUUID();
+    sendingRef.current = true;
+    generation.current += 1;
+    setRestarting(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repository, number, action: "restart", requestId: restartRequest.current }) });
+      const value = await response.json();
+      if (!response.ok) {
+        throw new Error(value.error || "Could not restart this chat");
+      }
+      if (active.current) {
+        generation.current += 1;
+        setChat(value);
+        pendingRequest.current = null;
+        restartRequest.current = null;
+        persistDraft();
+        follow.current = true;
+        composerRef.current?.focus();
+      }
+    } catch (failure) {
+      if (active.current) {
+        setError(failure.message);
+      }
+    } finally {
+      sendingRef.current = false;
+      if (active.current) {
+        setRestarting(false);
+      }
     }
   }
 
@@ -199,8 +240,24 @@ export default function ReviewChat({ repository, number, children }) {
       <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20 15a3 3 0 0 1-3 3H9l-5 3V6a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v9Z" /><path d="M8 8h8M8 12h5" /></svg>
       {chat?.status === "running" && <span className="chat-running-dot" aria-label="Agent responding">●</span>}
     </button></div>}
-    <aside className="review-chat" id="review-chat" aria-label="Review chat" hidden={!open}>
-      <header className="review-chat-header"><div><strong>Review chat</strong><span>Luna · PR #{number}</span></div><button type="button" aria-label="Collapse review chat" aria-expanded={open} aria-controls="review-chat" onClick={() => setOpen(false)}>→</button></header>
+    <aside className="review-chat" id="review-chat" aria-label="PR chat and threads" hidden={!open}>
+      <header className="review-chat-header">
+        <div><strong>{panel === "chat" ? "Review chat" : "Unresolved threads"}</strong><span>PR #{number}{panel === "chat" ? " · Luna" : ""}</span></div>
+        <div className="chat-header-actions">
+          {panel === "chat" && <button className="chat-header-icon" type="button" onClick={restart} disabled={!draftReady || !chat || sending || restarting || chat.status === "running"} aria-label={restarting ? "Restarting chat" : "Restart chat session"} aria-busy={restarting} title="Restart chat · keeps your draft and archives this conversation">
+            <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7v5h-5M20 12a8 8 0 1 0-2.3 5.7" /></svg>
+          </button>}
+          <button className="chat-header-icon" type="button" aria-label="Collapse PR sidebar" title="Collapse sidebar" aria-expanded={open} aria-controls="review-chat" onClick={() => setOpen(false)}>
+            <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M15 4v16m-7-11 3 3-3 3" /></svg>
+          </button>
+        </div>
+      </header>
+      <div className="pr-sidebar-tabs" aria-label="PR sidebar panels">
+        <button type="button" aria-pressed={panel === "chat"} onClick={() => setPanel("chat")}>Chat</button>
+        <button type="button" aria-pressed={panel === "threads"} onClick={() => setPanel("threads")}>Threads <span>{unresolvedThreads(details).length}</span></button>
+      </div>
+      {panel === "threads" && <UnresolvedThreads details={details} onUpdated={onThreadUpdated} />}
+      <div className="pr-sidebar-chat" hidden={panel !== "chat"}>
       <div className="chat-messages" ref={messagesRef} onScroll={(event) => { const element = event.currentTarget; follow.current = element.scrollHeight - element.scrollTop - element.clientHeight < 70; }}>
         {!chat && !error && <p className="review-muted">Loading conversation…</p>}
         {chat?.messages.length === 0 && <div className="chat-empty"><strong>A second look at this PR</strong><p>Ask about bugs, tradeoffs, missing tests, or anything in the diff.</p></div>}
@@ -217,7 +274,8 @@ export default function ReviewChat({ repository, number, children }) {
           event.preventDefault();
           event.currentTarget.form.requestSubmit();
         }
-      }} /><div><span title={chat?.sessionId || "A session starts with your first message"}>{chat?.sessionId ? `Session ${chat.sessionId.slice(0, 8)}` : "Luna · PR context included"}</span><button type="submit" disabled={!draftReady || !chat || sending || chat.status === "running" || !draft.trim()}>{sending ? "Sending…" : "Send"}</button></div></form>
+      }} /><div><span title={chat?.sessionId || "A session starts with your first message"}>{chat?.sessionId ? `Session ${chat.sessionId.slice(0, 8)}` : "Luna · PR context included"}</span><button type="submit" disabled={!draftReady || !chat || sending || restarting || chat.status === "running" || !draft.trim()}>{sending ? "Sending…" : "Send"}</button></div></form>
+      </div>
     </aside>
   </div></ChatAttachmentsContext.Provider>;
 }

@@ -8,6 +8,17 @@ import { comparisonFiles, makeHunks, numberedLines, splitRows } from "../src/rev
 import { applyOperation, draftKey, emptyReview } from "../src/review/state.js";
 
 const directories = [];
+test("marking a file reviewed collapses its saved view without losing context settings", () => {
+  const key = draftKey("head", "app.js");
+  const state = { ...emptyReview(), fileViews: { [key]: { context: 20, full: true, fullSide: "LEFT", collapsed: false } } };
+  const operation = { type: "reviewed", filePath: "app.js", revision: "head", fingerprint: "hash", value: true };
+  const reviewed = applyOperation(state, operation);
+  expect(reviewed.fileViews[key]).toEqual({ context: 20, full: true, fullSide: "LEFT", collapsed: true });
+  const reopened = applyOperation(reviewed, { type: "fileView", revision: "head", filePath: "app.js", view: { ...reviewed.fileViews[key], collapsed: false } });
+  expect(reopened.reviewed["app.js"].fingerprint).toBe("hash");
+  expect(reopened.fileViews[key].collapsed).toBe(false);
+  expect(applyOperation(reopened, { ...operation, value: false }).fileViews[key].collapsed).toBe(false);
+});
 afterEach(async () => {
   for (const directory of directories.splice(0)) {
     await rm(directory, { recursive: true, force: true });

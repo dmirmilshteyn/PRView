@@ -33,6 +33,8 @@ export function applyOperation(state, operation) {
       if (operation.value) {
         next.reviewed = { ...next.reviewed, [operation.filePath]: { revision: operation.revision, fingerprint: operation.fingerprint } };
         next.baselineRevision ??= operation.revision;
+        const viewKey = draftKey(operation.revision, operation.filePath);
+        next.fileViews = { ...next.fileViews, [viewKey]: { context: 3, full: false, fullSide: "RIGHT", ...next.fileViews?.[viewKey], collapsed: true } };
       } else {
         delete next.reviewed[operation.filePath];
       }

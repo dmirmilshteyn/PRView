@@ -4,9 +4,9 @@ services:
       context: .
       dockerfile: .devcontainer/Dockerfile
     working_dir: /workspaces/PRView
-    command: sh -lc "bun install --frozen-lockfile && bun run dev"
+    command: sh -lc "bun install --frozen-lockfile && bun run dev --hostname 0.0.0.0"
     ports:
-      - "9999:9999"
+      - "127.0.0.1:9999:9999"
     environment:
       GH_CONFIG_DIR: /run/gh-auth
       CODEX_HOME: /root/.codex

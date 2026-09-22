@@ -11,7 +11,7 @@
     "start": "next start --hostname 127.0.0.1 --port 9999"
   },
   "dependencies": {
-    "diff": "8.0.4",
+    "diff": "9.0.0",
     "react-markdown": "10.1.0",
     "remark-gfm": "4.0.1",
     "next": "16.2.12",

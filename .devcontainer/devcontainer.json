@@ -5,17 +5,21 @@
     "context": ".."
   },
   "workspaceFolder": "/workspaces/PRView",
-  "initializeCommand": "sh .devcontainer/prepare-gh-auth.sh",
   "mounts": [
     "source=prview-codex-data,target=/root/.codex,type=volume",
-    "source=${localWorkspaceFolder}/.devcontainer/gh-auth,target=/run/gh-auth,type=bind,readonly",
-    "source=${localEnv:HOME}/.codex/auth.json,target=/root/.codex/auth.json,type=bind,readonly"
+    "source=${localEnv:HOME}/.config/gh,target=/run/gh-auth,type=bind,readonly",
+    "source=${localEnv:HOME}/.codex/auth.json,target=/root/.codex/auth.json,type=bind,readonly",
+    "source=prview-repository-data,target=/var/lib/prview/repositories,type=volume"
   ],
   "containerEnv": {
     "GH_CONFIG_DIR": "/run/gh-auth",
-    "CODEX_HOME": "/root/.codex"
+    "CODEX_HOME": "/root/.codex",
+    "PRVIEW_REPOSITORIES_DIR": "/var/lib/prview/repositories",
+    "GH_TOKEN": "${localEnv:GH_TOKEN}"
   },
-  "forwardPorts": [9999],
+  "forwardPorts": [
+    9999
+  ],
   "portsAttributes": {
     "9999": {
       "label": "Next.js development server",

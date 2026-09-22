@@ -6,16 +6,19 @@ services:
     working_dir: /workspaces/PRView
     command: sh -lc "bun install --frozen-lockfile && bun run dev --hostname 0.0.0.0"
     ports:
-      - "127.0.0.1:9999:9999"
+      - "127.0.0.1:${PRVIEW_PORT:-9999}:9999"
     environment:
       GH_CONFIG_DIR: /run/gh-auth
+      GH_TOKEN: ${GH_TOKEN:-}
+      PRVIEW_REPOSITORIES_DIR: /var/lib/prview/repositories
       CODEX_HOME: /root/.codex
     volumes:
       - .:/workspaces/PRView
       - /workspaces/PRView/node_modules
       - codex-data:/root/.codex
+      - repository-data:/var/lib/prview/repositories
       - type: bind
-        source: ./.devcontainer/gh-auth
+        source: ${HOME}/.config/gh
         target: /run/gh-auth
         read_only: true
         bind:
@@ -30,3 +33,5 @@ services:
 volumes:
   codex-data:
     name: prview-codex-data
+  repository-data:
+    name: prview-repository-data

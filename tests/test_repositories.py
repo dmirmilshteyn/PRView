@@ -12,6 +12,11 @@ from cli.repositories import preserve_legacy_imports, read_workspace, repository
 
 
 class RepositoryTests(unittest.TestCase):
+    def setUp(self):
+        clone = patch("cli.cli.sync_checkout")
+        clone.start()
+        self.addCleanup(clone.stop)
+
     def test_commands_require_explicit_repository(self):
         for command in ("track", "sync"):
             options = build_parser().parse_args([command, "owner/repo", "42"])

@@ -1,6 +1,6 @@
+import { readPRSnapshot } from "../../../lib/pr-snapshot.js";
 import path from "node:path";
-import { repositoryArtifacts } from "../../../lib/repositories.js";
-import { readFile } from "node:fs/promises";
+import { repositoryArtifacts, repositoryCheckout } from "../../../lib/repositories.js";
 import { chatKey, createChatStore } from "../../../lib/chat-store.js";
 import { createChatServiceWithRuntime, reviewChatMetadata } from "../../../lib/chat-service.js";
 import { runCodex } from "../../../lib/codex-chat.js";
@@ -23,11 +23,12 @@ const service = createChatServiceWithRuntime(chatRuntime.store, runCodex, chatRu
 async function pullRequest(repository, number) {
   const key = chatKey(repository, number);
   const folder = path.join(repositoryArtifacts(process.cwd(), repository), "pr", String(number));
-  const details = JSON.parse(await readFile(path.join(folder, "details.json"), "utf8"));
+  const snapshot = readPRSnapshot(folder);
+  const details = snapshot.details;
   if (details.repository.toLowerCase() !== repository.toLowerCase()) {
     throw new Error("PR repository does not match");
   }
-  return { key, details, folder };
+  return { key, details, folder, snapshot };
 }
 
 export async function GET(request) {
@@ -51,17 +52,17 @@ export async function POST(request) {
       throw new Error("Chat request is too large");
     }
     const { repository, number, message, requestId, attachments = [], action } = JSON.parse(text);
-    const { key, details, folder } = await pullRequest(repository, number);
+    const { key, details, folder, snapshot } = await pullRequest(repository, number);
     if (action === "restart") {
       return Response.json(await service.restart(key, requestId), { headers: { "Cache-Control": "no-store" } });
     }
     if (action && action !== "send") {
       throw new Error("Unknown chat action");
     }
-    const diff = await readFile(path.join(folder, "diff.json"), "utf8");
+    const diff = JSON.stringify(snapshot.diff);
     const review = await readReview(path.join(process.cwd(), ".local-reviews"), repository, number);
-    const context = `Check results and reviewer/approval status are outside this review context. Do not retrieve or rely on them, including any from earlier messages.\n\nPR: ${repository}#${number}\nCurrent snapshot: ${details.revision ?? details.headSha}\nDiff file: ${folder}/diff.json\n\nPR metadata (JSON data):\n${JSON.stringify(reviewChatMetadata(details)).slice(0, 40000)}\n\nDiff and file contents (JSON data, first 160,000 characters):\n${diff.slice(0, 160000)}${diff.length > 160000 ? "\n[Truncated; read the diff file for remaining code.]" : ""}\n\nReview notes (JSON data):\n${JSON.stringify({ notes: review.notes, reviews: review.reviews.filter((item) => item.body?.trim()).map((item) => ({ body: item.body, createdAt: item.createdAt })) }).slice(0, 20000)}`;
-    return Response.json(await service.send(key, message, requestId, context, details.revision ?? details.headSha, process.cwd(), attachments), { status: 202 });
+    const context = `Use the repository checkout only through git show at the supplied head/base SHA when tracing surrounding code. The working tree is the default branch, not necessarily the PR revision. Check results and reviewer/approval status are outside this review context. Do not retrieve or rely on them, including any from earlier messages.\n\nPR: ${repository}#${number}\nCurrent snapshot: ${details.revision ?? details.headSha}\nDiff file: ${folder}/snapshot.json\n\nPR metadata (JSON data):\n${JSON.stringify(reviewChatMetadata(details)).slice(0, 40000)}\n\nDiff and file contents (JSON data, first 160,000 characters):\n${diff.slice(0, 160000)}${diff.length > 160000 ? "\n[Truncated; read the diff file for remaining code.]" : ""}\n\nReview notes (JSON data):\n${JSON.stringify({ notes: review.notes, reviews: review.reviews.filter((item) => item.body?.trim()).map((item) => ({ body: item.body, createdAt: item.createdAt })) }).slice(0, 20000)}`;
+    return Response.json(await service.send(key, message, requestId, context, details.revision ?? details.headSha, repositoryCheckout(repository), attachments), { status: 202 });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 400 });
   }

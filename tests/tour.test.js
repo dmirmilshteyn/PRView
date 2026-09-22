@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { chatKey } from "../lib/chat-store.js";
-import { tourInput, tourFingerprint, tourLines, tourPrompt, validateTour } from "../lib/tour.js";
+import { tourInput, tourFingerprint, tourLines, tourLineRanges, tourPrompt, validateTour } from "../lib/tour.js";
 import { createTourStore } from "../lib/tour-store.js";
 import { createTourService } from "../lib/tour-service.js";
 
@@ -16,7 +16,7 @@ function input() {
   ] });
 }
 function tour() {
-  return { preparation: { summary: "The parser return contract changes for empty input.", areas: [{ title: "Caller expectations", context: "Callers previously received the original input.", whyItMatters: "An array fallback changes how callers interpret missing values." }] }, title: "Follow the empty-input path", overview: "Empty input now returns an array.", flow: "Input passes through src/parser.js.", steps: [{ title: "Guard behavior", risk: "medium", why: "Changes the return contract", explanation: "The fallback returns an empty array.", references: [{ path: "src/parser.js", side: "RIGHT", start: 1, end: 3 }], questions: ["Should false also become an array?"] }], mechanical: [], existingTests: [], suggestedTests: ["Pass false and check the expected contract"], notCovered: [], limitations: ["Tests were not supplied"] };
+  return { preparation: { summary: "The parser return contract changes for empty input.", areas: [{ title: "Caller expectations", context: "Callers previously received the original input.", whyItMatters: "An array fallback changes how callers interpret missing values." }] }, title: "Follow the empty-input path", overview: "Empty input now returns an array.", flow: "Input passes through src/parser.js.", steps: [{ kind: "code", title: "Guard behavior", risk: "medium", why: "Changes the return contract", explanation: "The fallback returns an empty array.", references: [{ path: "src/parser.js", side: "RIGHT", start: 1, end: 3 }], questions: ["Should false also become an array?"] }], mechanical: [], existingTests: [], suggestedTests: ["Pass false and check the expected contract"], notCovered: [], limitations: ["Tests were not supplied"] };
 }
 async function setup(runner) {
   const root = await mkdtemp(path.join(os.tmpdir(), "prview-tour-"));
@@ -68,15 +68,19 @@ test("tour references are grounded in source and uncovered files remain explicit
   expect([...tourLines(patch, "RIGHT")]).toEqual([[8, "context"], [9, "new"]]);
 });
 
-test("preparation guide is preserved and requires bounded, complete risk areas", () => {
+test("removed tour sections are neither required nor retained", () => {
   const value = tour();
-  expect(validateTour(JSON.stringify(value), input()).preparation).toEqual(value.preparation);
-  value.preparation = { summary: "No material high-risk area is evident in this snapshot.", areas: [] };
-  expect(validateTour(JSON.stringify(value), input()).preparation.areas).toEqual([]);
-  for (const preparation of [undefined, { summary: "Summary", areas: Array(5).fill({}) }, { summary: "Summary", areas: [{ title: "Area" }] }]) {
-    expect(() => validateTour(JSON.stringify({ ...value, preparation }), input())).toThrow();
-  }
-  expect(tourFingerprint({ ...input(), version: 3 })).not.toBe(tourFingerprint(input()));
+  delete value.preparation;
+  delete value.suggestedTests;
+  delete value.existingTests;
+  delete value.steps[0].why;
+  delete value.steps[0].questions;
+  const result = validateTour(JSON.stringify(value), input());
+  expect(result.preparation).toBeUndefined();
+  expect(result.suggestedTests).toBeUndefined();
+  expect(result.existingTests).toBeUndefined();
+  expect(result.steps[0].why).toBeUndefined();
+  expect(result.steps[0].questions).toBeUndefined();
 });
 
 test("generation is deduplicated and completed tours survive service restarts", async () => {
@@ -145,8 +149,77 @@ test("tour review progress persists, merges concurrent sections, and stays snaps
   expect(Object.keys((await store.read(key)).reviewedSections)).toEqual(["step-1"]);
   const otherKey = key.replace(/[^/]+$/, "d".repeat(64));
   expect((await restarted.get(otherKey)).reviewedSections).toBeUndefined();
+  await expect(restarted.markReviewed(key, "tests", true)).rejects.toThrow("Unknown");
   await expect(restarted.markReviewed(key, "step-999", true)).rejects.toThrow("Unknown");
   await expect(restarted.markReviewed(key, "mechanical", true)).rejects.toThrow("Unknown");
   await expect(restarted.markReviewed(key, "overview", "yes")).rejects.toThrow("required");
   await expect(restarted.markReviewed(otherKey, "overview", true)).rejects.toThrow("Generate");
+});
+
+test("reference manifests exclude trailing phantom lines and preserve gaps", () => {
+  const file = { path: "compose.yaml", headContent: { text: "services:\n  prview:\n" }, baseContent: { text: "" } };
+  expect(tourLineRanges(file, "RIGHT")).toEqual([[1, 2]]);
+  expect(tourLineRanges(file, "LEFT")).toEqual([]);
+  const partial = { hunks: [{ header: "@@ -1 +1 @@", lines: [" first"] }, { header: "@@ -9 +9 @@", lines: [" last"] }] };
+  expect(tourLineRanges(partial, "RIGHT")).toEqual([[1, 1], [9, 9]]);
+  expect(tourPrompt({ ...input(), files: [file] }, "/snapshot.json")).toContain('"availableLines":{"LEFT":[],"RIGHT":[[1,2]]}');
+});
+
+test("invalid generated references receive one correction in the same session", async () => {
+  const prompts = [];
+  const runner = async ({ prompt, sessionId, onEvent }) => {
+    prompts.push(prompt);
+    const value = tour();
+    if (prompts.length === 1) {
+      expect(sessionId).toBeNull();
+      value.steps[0].references[0].end = 4;
+      await onEvent({ type: "thread.started", thread_id: "repair-session" });
+    } else {
+      expect(sessionId).toBe("repair-session");
+      expect(prompt).toContain("line 4 is unavailable");
+      expect(prompt).toContain("[[1,3]]");
+    }
+    await onEvent({ type: "item.completed", item: { type: "agent_message", text: JSON.stringify(value) } });
+  };
+  const { service, key, source } = await setup(runner);
+  await service.generate(key, source, false);
+  const state = await finish(service, key);
+  expect(state.status).toBe("ready");
+  expect(state.tour.steps[0].references[0].end).toBe(3);
+  expect(prompts).toHaveLength(2);
+});
+
+test("invalid references remain errors after the bounded correction attempt", async () => {
+  let calls = 0;
+  const runner = async ({ onEvent }) => {
+    calls += 1;
+    const value = tour();
+    value.steps[0].references[0].end = 4;
+    await onEvent({ type: "item.completed", item: { type: "agent_message", text: JSON.stringify(value) } });
+  };
+  const { service, key, source } = await setup(runner);
+  await service.generate(key, source, false);
+  const state = await finish(service, key);
+  expect(state.status).toBe("error");
+  expect(state.error).toContain("line 4 is unavailable");
+  expect(calls).toBe(2);
+  expect(state.tour).toBeNull();
+});
+
+
+test("test stops follow code stops while preserving narrative order and references", () => {
+  const value = tour();
+  const stop = value.steps[0];
+  value.steps = [
+    { ...stop, kind: "test", title: "First test" },
+    { ...stop, title: "First code" },
+    { ...stop, kind: "test", title: "Second test" },
+    { ...stop, title: "Second code" },
+  ];
+  const result = validateTour(JSON.stringify(value), input());
+  expect(result.steps.map((step) => step.title)).toEqual(["First code", "Second code", "First test", "Second test"]);
+  expect(new Set(result.steps.map((step) => step.id)).size).toBe(4);
+  expect(result.steps[2].references[0].excerpt).toBe(result.steps[0].references[0].excerpt);
+  value.mechanical = [{ ...stop, kind: "test" }];
+  expect(() => validateTour(JSON.stringify(value), input())).toThrow("invalid review stops");
 });

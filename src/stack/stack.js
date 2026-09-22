@@ -1,9 +1,11 @@
+import { approvalStatus } from "../review/approval.js";
+
 function sameRepository(left, right) {
   return typeof left === "string" && typeof right === "string" && left.toLowerCase() === right.toLowerCase();
 }
 
 export function hasPullRequestApproval(details) {
-  return (details.github?.reviews ?? details.reviewHistory ?? []).some((review) => review.state === "APPROVED");
+  return approvalStatus(details).approved;
 }
 
 export function hasMergeConflict(details) {

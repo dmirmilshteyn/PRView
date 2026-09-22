@@ -1,9 +1,14 @@
 import argparse
 import sys
 import json
+import signal
+import os
+import subprocess
+from contextlib import contextmanager
 from pathlib import Path
 
-from cli.artifacts import build_artifacts, merge_groups, write_artifacts
+from cli.artifacts import build_artifacts, merge_groups, write_artifacts, write_json, GROUP_KEYS
+from cli.checkout import sync_checkout, fetch_pull_request
 from cli.github import GitHubClient
 from cli.repositories import preserve_legacy_imports, read_workspace, register_repository, repository_path, workspace_lock
 
@@ -46,7 +51,7 @@ def build_parser():
     track_parser.set_defaults(handler=track_repository, all=False, limit=None)
     repo_parser = subparsers.add_parser("repo", help="Register, list, or select repositories")
     repo_commands = repo_parser.add_subparsers(dest="repo_command", required=True)
-    for command in ("list", "use", "track"):
+    for command in ("list", "use", "track", "clone"):
         sub = repo_commands.add_parser(command)
         if command != "list":
             sub.add_argument("repository", help="OWNER/REPO")
@@ -107,100 +112,170 @@ def manage_repository(options):
                 return 0
             repository_path(options.output, options.repository)
             repository = next((item for item in workspace["repositories"] if item.lower() == options.repository.lower()), None)
-            if not repository:
-                if options.repo_command == "use":
+            if options.repo_command == "use":
+                if not repository:
                     raise ValueError("Repository is not tracked. Run 'pr repo track OWNER/REPO' first.")
-                repository = GitHubClient().get_repository_name(options.repository)
-            register_repository(options.output, repository)
-            print(f"Selected {repository}")
-            return 0
-    except (OSError, RuntimeError, ValueError) as error:
+                register_repository(options.output, repository, True)
+                print(f"Selected {repository}")
+                return 0
+        if not repository:
+            repository = GitHubClient().get_repository_name(options.repository)
+        with workspace_lock(repository_path(options.output, repository)):
+            sync_checkout(repository)
+            with workspace_lock(options.output):
+                register_repository(options.output, repository, True)
+        print(f"Selected {repository}")
+        return 0
+    except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as error:
         print(f"pr: {error}", file=sys.stderr)
         return 1
+
+
+@contextmanager
+def pr_timeout(seconds):
+    def expired(signum, frame):
+        raise TimeoutError("PR sync timed out; retry to resume")
+    previous = signal.signal(signal.SIGALRM, expired)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
 
 
 def sync_repository(options):
     try:
-        with workspace_lock(options.output):
-            return sync_locked(options)
-    except (OSError, RuntimeError, ValueError) as error:
+        return sync_locked(options)
+    except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as error:
         print(f"pr: {error}", file=sys.stderr)
         return 1
+
+
+def sync_one(options, client, repository, viewer_login, pull_request):
+    number = pull_request["number"]
+    folder = repository_path(options.output, repository) / "pr" / str(number)
+    previous_file = folder / "snapshot.json"
+    previous = json.loads(previous_file.read_text()) if previous_file.exists() else None
+    unchanged = previous and previous["details"].get("headSha") == pull_request["headRefOid"] and previous["details"].get("baseSha") == pull_request["baseRefOid"]
+    patch = "" if unchanged else client.get_pull_request_diff(repository, number)
+    groups, details, parsed_diffs = build_artifacts(repository, viewer_login, [pull_request], {number: patch})
+    details[number]["viewerLogin"] = viewer_login
+    details[number]["github"] = client.get_context(repository, number)
+    if unchanged:
+        parsed_diffs[number] = previous["diff"]
+        details[number]["diffBaseSha"] = previous["details"]["diffBaseSha"]
+    else:
+        merge_base = client.get_merge_base(repository, pull_request["baseRefOid"], pull_request["headRefOid"])
+        details[number]["diffBaseSha"] = merge_base
+        file_metadata = {file["filename"]: file for file in client.get_files(repository, number)}
+        for file in parsed_diffs[number]["files"]:
+            metadata = file_metadata.get(file["path"], {})
+            file["oldPath"] = metadata.get("previous_filename", file.get("oldPath", file["path"]))
+            file["baseContent"] = ({"text": "", "error": None} if file["status"] == "added" else
+                client.get_file(repository, file["oldPath"], merge_base))
+            file["headContent"] = ({"text": "", "error": None} if file["status"] == "deleted" else
+                client.get_file(repository, file["path"], pull_request["headRefOid"]))
+        # Retain content for paths that were changed in earlier snapshots,
+        # including changes reverted by the author since the last review.
+        historic_paths = set()
+        comparison_bases = {}
+        for snapshot_file in (options.output / "history" / repository / str(number)).glob("*.json"):
+            snapshot = json.loads(snapshot_file.read_text())
+            historic_paths.update(file["path"] for file in snapshot["diff"]["files"])
+            known = {file["path"] for file in snapshot["diff"]["files"]}
+            previous_head = snapshot["details"].get("headSha")
+            if previous_head:
+                extra = {}
+                for file in parsed_diffs[number]["files"]:
+                    if file["path"] not in known and file.get("oldPath") not in known:
+                        content = client.get_file(repository, file["path"], previous_head)
+                        extra[file["path"]] = {"text": "", "error": None} if content.get("missing") else content
+                comparison_bases[snapshot["details"]["revision"]] = extra
+        current_paths = {file["path"] for file in parsed_diffs[number]["files"]}
+        comparison_files = []
+        for file_path in sorted(historic_paths - current_paths):
+            content = client.get_file(repository, file_path, pull_request["headRefOid"])
+            if content.get("missing"):
+                content = {"text": "", "error": None}
+            comparison_files.append({"path": file_path, "headContent": content, "hunks": [], "status": "modified"})
+        parsed_diffs[number]["comparisonFiles"] = comparison_files
+        parsed_diffs[number]["comparisonBases"] = comparison_bases
+    client.verify_revision(repository, number, pull_request["headRefOid"], pull_request["baseRefOid"])
+    with workspace_lock(options.output):
+        groups = merge_groups(options.output, repository, groups, details)
+        write_artifacts(options.output, groups, details, parsed_diffs)
 
 
 def sync_locked(options):
-    try:
-        if options.number is not None and options.limit is not None:
-            raise ValueError("--limit can only be used with --all")
-        client = GitHubClient()
-        repository = client.get_repository_name(options.repository)
+    if options.number is not None and options.limit is not None:
+        raise ValueError("--limit can only be used with --all")
+    client = GitHubClient()
+    repository = client.get_repository_name(options.repository)
+    with workspace_lock(options.output):
         preserve_legacy_imports(options.output)
-        viewer_login = client.get_viewer_login()
-        pull_requests = select_pull_requests(client, repository, options.number, options.limit)
-        diffs = {
-            pull_request["number"]: client.get_pull_request_diff(
-                repository, pull_request["number"]
-            )
-            for pull_request in pull_requests
-        }
-        groups, details, parsed_diffs = build_artifacts(
-            repository, viewer_login, pull_requests, diffs
-        )
-        for pull_request in pull_requests:
-            number = pull_request["number"]
-            merge_base = client.get_merge_base(repository, pull_request["baseRefOid"], pull_request["headRefOid"])
-            details[number]["diffBaseSha"] = merge_base
-            details[number]["github"] = client.get_context(repository, number)
-            file_metadata = {file["filename"]: file for file in client.get_files(repository, number)}
-            for file in parsed_diffs[number]["files"]:
-                metadata = file_metadata.get(file["path"], {})
-                file["oldPath"] = metadata.get("previous_filename", file.get("oldPath", file["path"]))
-                file["baseContent"] = ({"text": "", "error": None} if file["status"] == "added" else
-                    client.get_file(repository, file["oldPath"], merge_base))
-                file["headContent"] = ({"text": "", "error": None} if file["status"] == "deleted" else
-                    client.get_file(repository, file["path"], pull_request["headRefOid"]))
-            # Retain content for paths that were changed in earlier snapshots,
-            # including changes reverted by the author since the last review.
-            historic_paths = set()
-            comparison_bases = {}
-            for snapshot_file in (options.output / "history" / repository / str(number)).glob("*.json"):
-                snapshot = json.loads(snapshot_file.read_text())
-                historic_paths.update(file["path"] for file in snapshot["diff"]["files"])
-                known = {file["path"] for file in snapshot["diff"]["files"]}
-                previous_head = snapshot["details"].get("headSha")
-                if previous_head:
-                    extra = {}
-                    for file in parsed_diffs[number]["files"]:
-                        if file["path"] not in known and file.get("oldPath") not in known:
-                            content = client.get_file(repository, file["path"], previous_head)
-                            extra[file["path"]] = {"text": "", "error": None} if content.get("missing") else content
-                    comparison_bases[snapshot["details"]["revision"]] = extra
-            current_paths = {file["path"] for file in parsed_diffs[number]["files"]}
-            comparison_files = []
-            for file_path in sorted(historic_paths - current_paths):
-                content = client.get_file(repository, file_path, pull_request["headRefOid"])
-                if content.get("missing"):
-                    content = {"text": "", "error": None}
-                comparison_files.append({"path": file_path, "headContent": content, "hunks": [], "status": "modified"})
-            parsed_diffs[number]["comparisonFiles"] = comparison_files
-            parsed_diffs[number]["comparisonBases"] = comparison_bases
-            client.verify_revision(repository, number, pull_request["headRefOid"], pull_request["baseRefOid"])
-        if not options.all:
-            groups = merge_groups(options.output, repository, groups, details)
-        write_artifacts(options.output, groups, details, parsed_diffs)
-        if not details:
-            from cli.artifacts import write_json
-            write_json(repository_path(options.output, repository) / "prs.json", groups)
-            register_repository(options.output, repository)
-    except (OSError, RuntimeError, ValueError) as error:
-        print(f"pr: {error}", file=sys.stderr)
-        return 1
-
-    print(
-        f"Synced {len(pull_requests)} pull request(s) from {repository} "
-        f"to {options.output}."
-    )
-    return 0
+        register_repository(options.output, repository, not options.all)
+    # Only writers for the same repository serialize; other repositories remain usable.
+    folder = repository_path(options.output, repository)
+    with workspace_lock(folder):
+        status_file = folder / "sync.json"
+        write_json(status_file, {"pid": os.getpid(), "status": "running", "total": 0, "completed": 0, "failed": [], "current": None})
+        try:
+            checkout = sync_checkout(repository)
+            client.checkout = checkout
+            viewer_login = client.get_viewer_login()
+            queue = [options.number] if options.number else client.list_pull_request_numbers(repository, options.limit)
+        except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as error:
+            write_json(status_file, {"status": "error", "error": str(error), "completed": 0, "total": 0, "failed": []})
+            raise
+        # Refresh previously tracked closed PRs as well, so stale open entries disappear.
+        index_file = folder / "prs.json"
+        if options.all and index_file.exists():
+            queue.extend(item["number"] for items in json.loads(index_file.read_text()).values() for item in items)
+        queue = list(dict.fromkeys(queue))
+        seen = set(queue)
+        stacks = {}
+        inherited_stacks = {}
+        failures = []
+        completed = []
+        status_file = folder / "sync.json"
+        def progress(status, current):
+            write_json(status_file, {"pid": os.getpid(), "status": status, "total": len(queue), "completed": len(completed), "failed": failures, "current": current})
+        progress("running", None)
+        for number in queue:
+            progress("running", number)
+            try:
+                with pr_timeout(600):
+                    pull_request = client.get_pull_request(repository, number)
+                    refs = client.get_refs(repository, number)
+                    if refs["head"] != pull_request["headRefOid"]:
+                        raise RuntimeError(f"PR #{number} changed during sync; retry")
+                    pull_request["baseRefOid"] = refs["base"]
+                    membership = refs.get("stack")
+                    if membership:
+                        stack_number = membership["number"]
+                        if stack_number not in stacks:
+                            stacks[stack_number] = client.get_stack(repository, stack_number)
+                        pull_request["stack"] = stacks[stack_number]
+                        for member in pull_request["stack"]["pull_requests"]:
+                            inherited_stacks[member["number"]] = pull_request["stack"]
+                            if member["number"] not in seen:
+                                seen.add(member["number"])
+                                queue.append(member["number"])
+                    elif number in inherited_stacks:
+                        pull_request["stack"] = inherited_stacks[number]
+                    fetch_pull_request(checkout, number)
+                    sync_one(options, client, repository, viewer_login, pull_request)
+                completed.append(number)
+            except (OSError, RuntimeError, ValueError, subprocess.SubprocessError) as error:
+                failures.append({"number": number, "error": str(error)})
+                print(f"PR #{number}: {error}", file=sys.stderr)
+            progress("running", None)
+        if not queue:
+            write_json(folder / "prs.json", {key: [] for key in GROUP_KEYS})
+        progress("error" if failures else "complete", None)
+        print(f"Synced {len(completed)} pull request(s) from {repository}; {len(failures)} failed.")
+        return 1 if failures else 0
 
 
 def main():

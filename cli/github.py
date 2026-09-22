@@ -7,6 +7,7 @@ import subprocess
 
 class GitHubClient:
     def __init__(self):
+        self.checkout = None
         if shutil.which("gh") is None:
             raise RuntimeError("GitHub CLI (gh) is not installed or is not on PATH")
 
@@ -42,6 +43,7 @@ class GitHubClient:
             "reviews",
             "statusCheckRollup",
             "title",
+            "state",
             "updatedAt",
             "url",
         ]
@@ -49,6 +51,11 @@ class GitHubClient:
             "pr", "view", str(number), "--repo", repository,
             "--json", ",".join(fields),
         ]))
+
+    def list_pull_request_numbers(self, repository, limit):
+        if limit is None:
+            return [item["number"] for item in self.get_pages(f"repos/{repository}/pulls?state=open&per_page=100")]
+        return [item["number"] for item in json.loads(self._run_text(["pr", "list", "--repo", repository, "--state", "open", "--limit", str(limit), "--json", "number"]))]
 
     def list_pull_requests(self, repository, limit):
         if limit is None:
@@ -120,6 +127,17 @@ class GitHubClient:
         return {"comments": comments, "reviews": reviews, "inlineComments": inline, "threads": threads}
 
     def get_file(self, repository, file_path, revision):
+        if self.checkout is not None:
+            result = subprocess.run(["git", "-C", str(self.checkout), "show", f"{revision}:{file_path}"], capture_output=True, timeout=60)
+            if result.returncode != 0:
+                message = result.stderr.decode("utf-8", errors="replace")
+                return {"text": None, "error": "Source is unavailable in the local repository.", "missing": "does not exist" in message or "exists on disk, but not in" in message}
+            if b"\x00" in result.stdout:
+                return {"text": None, "error": "Binary file; text context unavailable."}
+            try:
+                return {"text": result.stdout.decode("utf-8"), "error": None}
+            except UnicodeDecodeError:
+                return {"text": None, "error": "Non-UTF-8 file; text context unavailable."}
         endpoint = f"repos/{repository}/contents/{quote(file_path, safe='/')}?ref={quote(revision, safe='')}"
         try:
             result = json.loads(self._run_text(["api", endpoint]))
@@ -160,6 +178,8 @@ class GitHubClient:
             check=False,
             capture_output=True,
             text=True,
+            timeout=120,
+            cwd=self.checkout,
         )
 
         if completed.returncode != 0:

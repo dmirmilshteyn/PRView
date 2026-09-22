@@ -5,10 +5,6 @@ import TourCode from "./TourCode.jsx";
 import { nextUnreviewedIndex, ignoresReviewShortcut } from "./review-navigation.js";
 import { useLocalReview } from "./ReviewProvider.jsx";
 
-function TourList({ items, empty }) {
-  return items.length ? <ul>{items.map((item, index) => <li key={index}><Markdown>{item}</Markdown></li>)}</ul> : <p className="review-muted">{empty}</p>;
-}
-
 function TourReviewed({ section, title, reviewed, pending, onChange }) {
   return <label className="tour-reviewed" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
     <input type="checkbox" aria-label={`Reviewed: ${title}`} checked={reviewed} disabled={pending} onChange={(event) => onChange(section, event.target.checked)} />
@@ -19,12 +15,10 @@ function TourReviewed({ section, title, reviewed, pending, onChange }) {
 function TourStop({ stop, onOpenCode, revision, files }) {
   return <>
           <Markdown>{stop.explanation}</Markdown>
-          <div className={`tour-callout ${stop.risk}`}><h4>Why this matters · {stop.risk} focus</h4><Markdown>{stop.why}</Markdown></div>
           {stop.references.map((reference, index) => <div className="tour-code" key={index}>
             <header><span>{reference.path} · Diff around {reference.side === "LEFT" ? "old" : "new"} L{reference.start}{reference.end !== reference.start ? `–${reference.end}` : ""}</span><button type="button" onClick={() => onOpenCode(reference)}>Open in Code</button></header>
             <TourCode reference={reference} revision={revision} file={files.find((file) => file.path === reference.path)} onOpenCode={onOpenCode} />
           </div>)}
-          <div className="tour-questions"><h4>Things to look for</h4><TourList items={stop.questions} empty="" /></div>
   </>;
 }
 
@@ -277,15 +271,15 @@ export default function ReviewTour({ details, diff, fileCount, active, onOpenCod
       <span className="tour-spinner" aria-hidden="true" />
       <h3>Building your review tour</h3>
       <p role="status">{state?.activity || "Looking for a saved tour…"}</p>
-      <p className="review-muted">Luna maps {fileCount} changed files into a review route, with code references, risk checkpoints, and test ideas. Larger PRs can take a few minutes.</p>
+      <p className="review-muted">Luna maps {fileCount} changed files into a review route, with code references and coverage information. Larger PRs can take a few minutes.</p>
       <p className="review-muted">You can return to Code while it runs. The completed tour will be saved for this snapshot.</p>
     </div>;
   }
   const tour = state.tour;
   const mechanical = tour.mechanical ?? [];
   const mechanicalIndex = mechanical.length ? tour.steps.length + 1 : -1;
-  const sections = ["Overview", ...tour.steps.map((step) => step.title.replace(/^\d+[.)]\s*/, "")), ...(mechanical.length ? ["Mechanical changes"] : []), "Tests & coverage"];
-  const sectionKeys = ["overview", ...tour.steps.map((step) => `step-${step.id}`), ...(mechanical.length ? ["mechanical"] : []), "tests"];
+  const sections = ["Overview", ...tour.steps.map((step) => step.title.replace(/^\d+[.)]\s*/, "")), ...(mechanical.length ? ["Mechanical changes"] : [])];
+  const sectionKeys = ["overview", ...tour.steps.map((step) => `step-${step.id}`), ...(mechanical.length ? ["mechanical"] : [])];
   const reviewedSections = state.reviewedSections ?? {};
   const reviewedCount = sectionKeys.filter((key) => reviewedSections[key]).length;
   const nextUnreviewed = nextUnreviewedIndex(sectionKeys, selected, new Set(sectionKeys.filter((key) => reviewedSections[key])));
@@ -310,16 +304,6 @@ export default function ReviewTour({ details, diff, fileCount, active, onOpenCod
         <div className="tour-callout"><h4>Follow the change</h4><Markdown>{tour.flow}</Markdown></div>
       </details>
     </div>
-    {tour.preparation && <section className="tour-preparation" aria-label="Before you start">
-      <p className="eyebrow">Before you start</p>
-      <h3>What to keep in mind</h3>
-      <Markdown>{tour.preparation.summary}</Markdown>
-      {tour.preparation.areas.length > 0 && <div className="tour-preparation-areas">{tour.preparation.areas.map((area, index) => <article key={index}>
-        <h4>{area.title}</h4>
-        <Markdown>{area.context}</Markdown>
-        <div className="tour-preparation-impact"><strong>Why it matters</strong><Markdown>{area.whyItMatters}</Markdown></div>
-      </article>)}</div>}
-    </section>}
     <div className="tour-review-progress"><strong>{reviewedCount} / {sections.length} sections reviewed</strong><span role="status">{saving.size ? "Saving…" : saveError ? "Not saved" : "Saved"}</span></div>
     {saveError && <p className="tour-save-error" role="alert">{saveError}</p>}
     <div className="review-options"><label><input type="checkbox" checked={review.state.preferences.split ?? false} disabled={!review.ready} onChange={(event) => review.update({ type: "preferences", preferences: { split: event.target.checked } })} /> Split view</label></div>
@@ -334,7 +318,7 @@ export default function ReviewTour({ details, diff, fileCount, active, onOpenCod
       <aside className="review-sidebar tour-sidebar" aria-label="Tour sections" ref={sidebar}>
         <strong>Changes by area</strong>
         {sections.map((title, index) => <button key={index} type="button" className={selected === index ? "active" : ""} aria-current={selected === index ? "location" : undefined} aria-controls={`tour-section-${index}`} onClick={() => navigate(index)}>
-          <span className={`tour-stop-number ${reviewedSections[sectionKeys[index]] ? "is-reviewed" : ""}`}><span aria-label={reviewedSections[sectionKeys[index]] ? "Reviewed" : undefined}>{reviewedSections[sectionKeys[index]] ? "✓" : index === 0 ? "◉" : index === sections.length - 1 ? "◎" : index === mechanicalIndex ? "◇" : index}</span></span>
+          <span className={`tour-stop-number ${reviewedSections[sectionKeys[index]] ? "is-reviewed" : ""}`}><span aria-label={reviewedSections[sectionKeys[index]] ? "Reviewed" : undefined}>{reviewedSections[sectionKeys[index]] ? "✓" : index === 0 ? "◉" : index === mechanicalIndex ? "◇" : index}</span></span>
           <span>{title}</span>
         </button>)}
       </aside>
@@ -348,13 +332,6 @@ export default function ReviewTour({ details, diff, fileCount, active, onOpenCod
           <p className="review-muted">Prop plumbing, repetitive wiring, and other behavior-preserving edits. Expand the code references for a quick consistency review.</p>
           {mechanical.map((stop) => <div className="tour-mechanical-group" key={stop.id}><h4>{stop.title.replace(/^\d+[.)]\s*/, "")}</h4><TourStop stop={stop} onOpenCode={onOpenCode} revision={details.revision} files={diff.files} /></div>)}
         </details>}
-        <details open={!reviewedSections[sectionKeys[sections.length - 1]]} className="tour-section" id={`tour-section-${sections.length - 1}`} aria-labelledby="tour-tests-heading" ref={(element) => { sectionElements.current[sections.length - 1] = element; }}>
-          <summary className="tour-section-heading"><p className="eyebrow">Before you finish</p><h3 id="tour-tests-heading" tabIndex={-1}>Tests & coverage</h3>{reviewedIndicator(sections.length - 1)}</summary>
-          <h4>Tests found in the change</h4><TourList items={tour.existingTests} empty="No existing test coverage was identified in the supplied snapshot." />
-          <h4>What to verify</h4><TourList items={tour.suggestedTests} empty="No additional test scenarios were suggested." />
-          <h4>Outside the guided route</h4>{tour.notCovered.length ? <ul>{tour.notCovered.map((file) => <li key={file.path}><strong>{file.path}</strong><Markdown>{file.reason}</Markdown></li>)}</ul> : <p>Every changed file is referenced by a tour stop.</p>}
-          <h4>Evidence & limitations</h4><TourList items={tour.limitations} empty="Luna reported no additional limitations." /><p className="review-muted">This tour explains the supplied snapshot. It does not run tests or mark files reviewed.</p>
-        </details>
       </div>
     </div>
   </section>;

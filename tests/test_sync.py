@@ -12,6 +12,13 @@ from test_artifacts import pull_request
 
 
 class SyncTests(unittest.TestCase):
+    def setUp(self):
+        clone = patch("cli.cli.sync_checkout", return_value=Path("/tmp/test-checkout"))
+        fetch = patch("cli.cli.fetch_pull_request")
+        clone.start()
+        fetch.start()
+        self.addCleanup(clone.stop)
+        self.addCleanup(fetch.stop)
 
     @patch("cli.cli.GitHubClient")
     def test_target_sync_expands_native_stack_without_listing_repository(self, client_type):
@@ -167,7 +174,8 @@ class SyncTests(unittest.TestCase):
         client = client_type.return_value
         client.get_repository_name.return_value = "owner/repo"
         client.get_viewer_login.return_value = "reviewer"
-        client.list_pull_requests.return_value = [pull_request(headRefOid="a" * 40, baseRefOid="b" * 40)]
+        client.list_pull_request_numbers.return_value = [42]
+        client.get_pull_request.return_value = pull_request(headRefOid="a" * 40, baseRefOid="b" * 40)
         client.get_pull_request_diff.return_value = "diff --git a/src/widget.py b/src/widget.py\n@@ -1 +1 @@\n-old\n+new\n"
         client.get_context.return_value = {"comments": [], "reviews": [], "inlineComments": [], "threads": []}
         client.get_merge_base.return_value = "c" * 40

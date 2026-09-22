@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 
+import ApprovalIndicator from "./review/ApprovalIndicator.jsx";
+import CheckIndicators from "./review/CheckIndicators.jsx";
 import CodeTour from "./review/CodeTour.jsx";
 import ChangeStats from "./review/ChangeStats.jsx";
 import ReviewProvider from "./review/ReviewProvider.jsx";
 import PinProvider, { usePins } from "./review/PinProvider.jsx";
+import IgnoreButton from "./review/IgnoreButton.jsx";
 import PinButton from "./review/PinButton.jsx";
 import RefreshButton from "./review/RefreshButton.jsx";
 import PRHotkeys from "./review/PRHotkeys.jsx";
@@ -87,6 +90,8 @@ function PullRequestCard({ pullRequest }) {
       </div>
       {pullRequest.shortSummary && <p>{pullRequest.shortSummary}</p>}
       <div className="pr-card-footer">
+        <span className="pr-card-status"><span className="pr-card-status-label">Review</span><ApprovalIndicator details={pullRequest} /></span>
+        <span className="pr-card-status"><span className="pr-card-status-label">Checks</span><CheckIndicators details={pullRequest} linkToChecks={false} /></span>
         {pullRequest.author && <p className="pr-card-author">By {pullRequest.author}</p>}
         <ChangeStats additions={pullRequest.additions} deletions={pullRequest.deletions} />
         {pullRequest.labels?.length > 0 && <div className="labels pr-card-labels" aria-label="Labels">
@@ -95,7 +100,7 @@ function PullRequestCard({ pullRequest }) {
         {pullRequest.mergeConflict && <div className="pr-card-badges"><PRStatusBadge kind="conflict">Merge conflicts</PRStatusBadge></div>}
       </div>
     </Link>
-    <PinButton number={pullRequest.number} iconOnly={true} />
+    <div className="pr-card-actions"><PinButton number={pullRequest.number} iconOnly={true} /><IgnoreButton number={pullRequest.number} iconOnly={true} /></div>
     </div>
   );
 }
@@ -124,16 +129,19 @@ function DashboardGroup({ label, accent, items, emptyMessage }) {
 }
 
 function PullRequestGroups({ pullRequests }) {
-  const { pins } = usePins();
-  const pinned = categories.flatMap((category) => getCategoryItems(pullRequests, category)).filter((pr) => pins.has(pr.number));
+  const { pins, ignored } = usePins();
+  const all = categories.flatMap((category) => getCategoryItems(pullRequests, category));
+  const pinned = all.filter((pr) => pins.has(pr.number) && !ignored.has(pr.number));
+  const ignoredPRs = all.filter((pr) => ignored.has(pr.number));
   return (
     <div className="pr-groups">
       <DashboardGroup label="Pinned" accent="amber" items={pinned} emptyMessage="Pin a pull request to keep it here." />
       {categories.map((category) => {
-        const items = getCategoryItems(pullRequests, category).filter((pr) => !pins.has(pr.number));
+        const items = getCategoryItems(pullRequests, category).filter((pr) => !pins.has(pr.number) && !ignored.has(pr.number));
 
         return <DashboardGroup key={category.key} label={category.label} accent={category.accent} items={items} emptyMessage="No pull requests in this group." />;
       })}
+      <DashboardGroup label="Ignored" accent="slate" items={ignoredPRs} emptyMessage="Ignored pull requests will appear here." />
     </div>
   );
 }
@@ -224,6 +232,7 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
         </Link>
         <div className="detail-actions">
           <PinButton number={pullRequest.number} iconOnly={false} />
+          <IgnoreButton number={pullRequest.number} iconOnly={false} />
           <RefreshButton repository={details.repository} number={details.number} />
           <TopReviewMenu details={details} files={diff?.files ?? []} />
           <PRHotkeys key={`${details.repository}:${number}`} stack={getPullRequestStack(details, stackPRs)} link={details.link} repository={details.repository} number={details.number} onAssigned={(result) => setAssignment({ source: prDetails[number], assignees: result.assignees, until: Date.now() + 60000 })} onReviewerRequested={(result) => setRequestedReviewers({ source: prDetails[number], reviewRequests: result.reviewRequests, until: Date.now() + 60000 })} />
@@ -231,6 +240,7 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
       </div>
       <h1>{details.title}</h1>
       <div className="live-pr-status" aria-label="Live pull request status">
+        <ApprovalIndicator details={details} /><CheckIndicators details={details} linkToChecks={true} />
         <span className="review-badge">{details.liveState === "MERGED" ? "Merged" : details.liveState === "CLOSED" ? "Closed" : details.liveState ? details.draft ? "Draft" : "Open" : "Loading live status…"}</span>
         {hasMergeConflict(details) ? <PRStatusBadge kind="conflict">Merge conflicts</PRStatusBadge> : details.liveState === "OPEN" && <span className="pr-merge-status">{details.mergeState === "unknown" ? "Checking mergeability…" : `Merge status: ${details.mergeState?.replaceAll("_", " ") ?? "unknown"}`}</span>}
         <PRStatusBadge kind={details.reviewRequests?.length ? "review-pending" : "review-clear"}>
@@ -298,7 +308,7 @@ function PullRequestDetail({ pullRequests, prDetails, prDiffs, revisions, stackP
             </div>
             <div>
               <dt>Checks</dt>
-              <dd>{details.checks}</dd>
+              <dd><CheckIndicators details={details} linkToChecks={true} /></dd>
             </div>
             <div>
               <dt>Changes</dt>

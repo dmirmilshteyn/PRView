@@ -1,4 +1,5 @@
 import Markdown from "./Markdown.jsx";
+import CheckIndicators from "./CheckIndicators.jsx";
 import AutoMergeToggle from "./AutoMergeToggle.jsx";
 import GitHubMessage from "./GitHubMessage.jsx";
 import GitHubLink from "./GitHubLink.jsx";
@@ -30,12 +31,12 @@ export default function PullRequestContext({ details, onThreadUpdated, children 
     <div>
     <h2>Checks</h2>
     {details.checkRuns?.length ? <ul className="check-list">{details.checkRuns.map((check, index) => <li key={index}>
-      <strong>{check.name || check.context || "Check"}</strong><span>{check.conclusion || check.state || check.status}</span>
+      <strong>{check.name || check.context || "Check"}</strong><CheckIndicators details={{ checkRuns: [check] }} linkToChecks={false} />
       {(check.detailsUrl || check.targetUrl) && <a href={check.detailsUrl || check.targetUrl} target="_blank" rel="noreferrer">Details ↗</a>}
-    </li>)}</ul> : <p>{details.checks}</p>}
+    </li>)}</ul> : <CheckIndicators details={details} linkToChecks={false} />}
     </div>
     </div>
-    <details className="pr-discussion" open>
+    <details className="pr-discussion">
     <summary><h2>PR discussion</h2><span className="discussion-count">{entries.length}</span></summary>
     {!github && <p className="review-muted">Sync to import discussions.</p>}
     {github && !entries.length && <div className="discussion-empty">

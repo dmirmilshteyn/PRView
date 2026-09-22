@@ -10,6 +10,7 @@ PRView is a Next.js application using Bun and the App Router.
 - Do not install or invoke project dependencies from the host environment.
 - The development server listens on `127.0.0.1:9999` by default. Compose binds it to the container interface and publishes the host port on `127.0.0.1` only.
 - Dependencies are installed with `bun install --frozen-lockfile`.
+- All package versions must always be pinned to specific, exact versions. Do not use version ranges, `^`, `~`, wildcards, or tags such as `latest` in package manifests. Keep the lockfile in sync with manifest changes.
 
 ## Common commands
 

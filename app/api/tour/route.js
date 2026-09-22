@@ -1,5 +1,6 @@
+import { readPRSnapshot } from "../../../lib/pr-snapshot.js";
 import path from "node:path";
-import { repositoryArtifacts } from "../../../lib/repositories.js";
+import { repositoryArtifacts, repositoryCheckout } from "../../../lib/repositories.js";
 import { readFile } from "node:fs/promises";
 import { chatKey } from "../../../lib/chat-store.js";
 import { runCodex } from "../../../lib/codex-chat.js";
@@ -10,7 +11,7 @@ import { createTourService } from "../../../lib/tour-service.js";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 const serviceKey = Symbol.for("prview.tour-service");
-const service = globalThis[serviceKey] ??= createTourService(createTourStore(path.join(process.cwd(), ".pr-tours")), runCodex, process.cwd());
+const service = globalThis[serviceKey] ??= createTourService(createTourStore(path.join(process.cwd(), ".pr-tours")), (options) => runCodex({ ...options, cwd: repositoryCheckout(options.repository) }), process.cwd());
 
 export async function GET(request) {
   try {
@@ -54,7 +55,7 @@ export async function POST(request) {
     const { repository, number, revision, baseSha, retry } = JSON.parse(text);
     const prKey = chatKey(repository, number);
     const folder = path.join(repositoryArtifacts(process.cwd(), repository), "pr", String(number));
-    const details = JSON.parse(await readFile(path.join(folder, "details.json"), "utf8"));
+    const details = readPRSnapshot(folder).details;
     if (details.repository.toLowerCase() !== repository.toLowerCase()) {
       throw new Error("PR repository does not match");
     }

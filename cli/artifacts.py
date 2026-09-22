@@ -44,7 +44,8 @@ def build_artifacts(repository, viewer_login, pull_requests, diffs):
         number = pull_request["number"]
         summary = build_summary(pull_request)
         group = choose_group(pull_request, viewer_login)
-        groups[group].append(summary)
+        if pull_request.get("state", "OPEN") == "OPEN" or pull_request.get("stack"):
+            groups[group].append(summary)
         details[number] = build_details(repository, pull_request)
         parsed_diffs[number] = parse_diff(diffs[number], pull_request.get("files", []))
 
@@ -69,6 +70,7 @@ def build_details(repository, pull_request):
     return {
         **build_summary(pull_request),
         "repository": repository,
+        "state": pull_request.get("state", "OPEN"),
         "stack": build_stack(pull_request.get("stack")),
         "body": pull_request.get("body", ""),
         "headSha": pull_request.get("headRefOid"),
@@ -357,6 +359,13 @@ def write_artifacts(output_directory, groups, details, diffs):
         repository = pull_request_details.get("repository", "unknown/repository")
         if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository) or any(part in (".", "..") for part in repository.split("/")):
             raise ValueError("Invalid repository name")
+        scoped = repository_path(output_directory, repository)
+        prior_folder = scoped / "pr" / str(number)
+        if not (prior_folder / "snapshot.json").exists() and (prior_folder / "details.json").exists() and (prior_folder / "diff.json").exists():
+            write_json(prior_folder / "snapshot.json", {
+                "details": json.loads((prior_folder / "details.json").read_text()),
+                "diff": json.loads((prior_folder / "diff.json").read_text()),
+            })
         for file in [*diffs[number]["files"], *diffs[number].get("comparisonFiles", [])]:
             content = {key: value for key, value in file.items() if key != "fingerprint"}
             file["fingerprint"] = hashlib.sha256(json.dumps(content, sort_keys=True).encode()).hexdigest()
@@ -371,11 +380,13 @@ def write_artifacts(output_directory, groups, details, diffs):
         scoped = repository_path(output_directory, repository)
         write_json(scoped / "pr" / str(number) / "diff.json", diffs[number])
         write_json(scoped / "pr" / str(number) / "details.json", pull_request_details)
+        # The single published record is the authoritative atomic metadata/code pair.
+        write_json(scoped / "pr" / str(number) / "snapshot.json", {"details": pull_request_details, "diff": diffs[number]})
 
     write_json(output_directory / "prs.json", groups)
     for repository in {detail.get("repository", "unknown/repository") for detail in details.values()}:
         write_json(repository_path(output_directory, repository) / "prs.json", groups)
-        register_repository(output_directory, repository)
+        register_repository(output_directory, repository, False)
 
 
 def write_json(destination, payload):

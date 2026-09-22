@@ -1,5 +1,5 @@
 export function emptyReview() {
-  return { version: 1, reviewed: {}, drafts: {}, notes: [], reviews: [], reviewDrafts: {}, positions: {}, fileViews: {}, preferences: {}, baselineRevision: null };
+  return { version: 1, ignored: false, reviewed: {}, drafts: {}, notes: [], reviews: [], reviewDrafts: {}, positions: {}, fileViews: {}, preferences: {}, baselineRevision: null };
 }
 
 export function draftKey(revision, filePath) {
@@ -11,6 +11,10 @@ export function applyOperation(state, operation) {
   switch (operation.type) {
     case "cancelReview": {
       // Wait for GitHub before restoring the draft; there is no optimistic change.
+      break;
+    }
+    case "ignore": {
+      next.ignored = operation.value;
       break;
     }
     case "pin": {

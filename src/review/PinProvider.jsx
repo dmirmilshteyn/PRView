@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 
 const PinContext = createContext(null);
 
@@ -8,29 +8,35 @@ export function usePins() {
 
 export default function PinProvider({ pullRequests, children }) {
   const [pins, setPins] = useState(() => new Set(pullRequests.filter((pr) => pr.pinned).map((pr) => pr.number)));
+  const [ignored, setIgnored] = useState(() => new Set(pullRequests.filter((pr) => pr.ignored).map((pr) => pr.number)));
+  const pendingRequests = useRef(new Set());
   const [pending, setPending] = useState(new Set());
   const [error, setError] = useState(null);
   useEffect(() => {
     setPins(new Set(pullRequests.filter((pr) => pr.pinned).map((pr) => pr.number)));
+    setIgnored(new Set(pullRequests.filter((pr) => pr.ignored).map((pr) => pr.number)));
   }, [pullRequests]);
 
-  async function toggle(number) {
+  async function toggleFlag(number, type) {
     const pr = pullRequests.find((item) => item.number === number);
-    if (!pr || pending.has(number)) {
+    if (!pr || pendingRequests.current.has(number)) {
       return;
     }
-    const value = !pins.has(number);
+    const values = type === "pin" ? pins : ignored;
+    const setValues = type === "pin" ? setPins : setIgnored;
+    const value = !values.has(number);
+    pendingRequests.current.add(number);
     setPending((current) => new Set([...current, number]));
     setError(null);
     try {
       const response = await fetch("/api/review", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repository: pr.repository, number, operation: { type: "pin", value } }), keepalive: true,
+        body: JSON.stringify({ repository: pr.repository, number, operation: { type, value } }), keepalive: true,
       });
       if (!response.ok) {
-        throw new Error((await response.json()).error || "Could not save pin");
+        throw new Error((await response.json()).error || `Could not save ${type}`);
       }
-      setPins((current) => {
+      setValues((current) => {
         const next = new Set(current);
         if (value) {
           next.add(number);
@@ -40,8 +46,9 @@ export default function PinProvider({ pullRequests, children }) {
         return next;
       });
     } catch (failure) {
-      setError(`Could not ${value ? "pin" : "unpin"} PR #${number}: ${failure.message}. Try again.`);
+      setError(`Could not ${value ? type : `un${type}`} PR #${number}: ${failure.message}. Try again.`);
     } finally {
+      pendingRequests.current.delete(number);
       setPending((current) => {
         const next = new Set(current);
         next.delete(number);
@@ -50,7 +57,7 @@ export default function PinProvider({ pullRequests, children }) {
     }
   }
 
-  return <PinContext.Provider value={{ pins, pending, toggle, available: new Set(pullRequests.map((pr) => pr.number)) }}>
+  return <PinContext.Provider value={{ pins, ignored, pending, toggle: (number) => toggleFlag(number, "pin"), toggleIgnored: (number) => toggleFlag(number, "ignore"), available: new Set(pullRequests.map((pr) => pr.number)) }}>
     {error && <p className="pin-error" role="alert">{error}</p>}
     {children}
   </PinContext.Provider>;

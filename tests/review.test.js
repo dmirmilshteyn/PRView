@@ -190,3 +190,23 @@ test("renames compare against the previous path without a duplicate deletion", (
   expect(result[0].renamedSinceReview).toBe(true);
   expect(result[0].comparisonUnavailable).toBe(false);
 });
+
+test("ignoring persists independently of pins and review data, and stays repository-scoped", async () => {
+  const root = await temporaryRoot();
+  await Promise.all([
+    updateReview(root, "owner/repo", 1, { type: "pin", value: true }),
+    updateReview(root, "owner/repo", 1, { type: "ignore", value: true }),
+    updateReview(root, "owner/repo", 1, { type: "note", note: note("ignored-note") }),
+  ]);
+  const ignored = await readReview(root, "owner/repo", 1);
+  expect(ignored.ignored).toBe(true);
+  expect(ignored.pinned).toBe(true);
+  expect(ignored.notes[0].id).toBe("ignored-note");
+  expect((await readReview(root, "other/repo", 1)).ignored).toBe(false);
+  await updateReview(root, "owner/repo", 1, { type: "ignore", value: false });
+  const restored = await readReview(root, "owner/repo", 1);
+  expect(restored.ignored).toBe(false);
+  expect(restored.pinned).toBe(true);
+  expect(restored.notes).toEqual(ignored.notes);
+  await expect(updateReview(root, "owner/repo", 1, { type: "ignore", value: "true" })).rejects.toThrow("Invalid review operation");
+});

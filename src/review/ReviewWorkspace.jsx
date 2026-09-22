@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocalReview } from "./ReviewProvider.jsx";
+import SnapshotPicker from "./SnapshotPicker.jsx";
 import FinalReview from "./FinalReview.jsx";
 import { draftKey } from "./state.js";
 import { changesSinceReview, lastSubmittedReview } from "./review-changes.js";
@@ -16,6 +17,7 @@ export default function ReviewWorkspace({ details, diff, revisions, active, navi
   const [selection, setSelection] = useState({});
   const [restored, setRestored] = useState(false);
   const [jumpTarget, setJumpTarget] = useState(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [chosenBaseline, setChosenBaseline] = useState(null);
   const fileElements = useRef(new Map());
   const navigationRef = useRef(null);
@@ -225,15 +227,20 @@ export default function ReviewWorkspace({ details, diff, revisions, active, navi
         <label><input type="checkbox" checked={state.preferences.ignoreWhitespace ?? false} onChange={(event) => preference("ignoreWhitespace", event.target.checked)} /> Ignore whitespace</label>
         <label><input type="checkbox" checked={sinceReview} disabled={!baseline} onChange={(event) => { setSelection({}); preference("sinceReview", event.target.checked); }} /> {lastReview?.revision === baselineRevision ? "Changes since last review" : "Changes since baseline"}</label>
       </div>
-      <div className="review-options">
-        <label>Snapshot <select aria-label="Snapshot" value={viewedRevision} onChange={(event) => switchRevision(event.target.value)}>{Object.entries(revisions).map(([key, value]) => <option key={key} value={key}>{key.slice(0, 8)}{key === details.revision ? " (current)" : ""} · {value.details.syncedAt ? new Date(value.details.syncedAt).toLocaleString() : "Imported snapshot"}</option>)}</select></label>
-        <label>Review baseline <select aria-label="Review baseline" value={baselineRevision ?? ""} onChange={(event) => chooseBaseline(event.target.value)}>
-          {baselineRevision && !baseline && <option value={baselineRevision}>{baselineRevision.slice(0, 8)} (snapshot unavailable)</option>}
-          <option value="" disabled>Mark a file reviewed or choose a snapshot</option>{Object.keys(revisions).map((key) => <option key={key} value={key}>{key.slice(0, 8)}</option>)}
-        </select></label>
-        <button type="button" onClick={() => chooseBaseline(revision)}>Use this snapshot as baseline</button>
-        {lastReview && baselineRevision !== lastReview.revision && <button type="button" onClick={() => chooseBaseline(lastReview.revision)}>Use last submitted review</button>}
+      <div className="review-options snapshot-toolbar">
+        <button type="button" className="snapshot-picker-trigger" aria-haspopup="dialog" onClick={() => setPickerOpen(true)}>
+          <span>Snapshot <code>{revision.slice(0, 8)}</code>{revision === details.revision ? " · Current" : " · Earlier"}</span>
+          <span>Baseline <code>{baselineRevision?.slice(0, 8) ?? "Not selected"}</code></span>
+          <strong>Change comparison <span aria-hidden="true">↗</span></strong>
+        </button>
       </div>
+      {pickerOpen && <SnapshotPicker revisions={revisions} currentRevision={details.revision} viewedRevision={revision} baselineRevision={baselineRevision} lastReviewRevision={lastReview?.revision} sinceReview={sinceReview} onClose={() => setPickerOpen(false)} onApply={({ snapshot: selectedSnapshot, baseline: selectedBaseline, compare }) => {
+        if (selectedSnapshot !== revision) { switchRevision(selectedSnapshot); }
+        if (selectedBaseline && selectedBaseline !== baselineRevision) { chooseBaseline(selectedBaseline); }
+        setSelection({});
+        preference("sinceReview", compare);
+        setPickerOpen(false);
+      }} />}
       <p className="review-muted">{details.syncedAt ? `Last synced ${new Date(details.syncedAt).toLocaleString()}.` : "This is a legacy snapshot; sync for full context and commit history."}</p>
       {viewedRevision !== details.revision && <p className="revision-warning">Viewing an earlier snapshot. <button onClick={() => switchRevision(details.revision)}>Return to current snapshot</button></p>}
       {!lastReview && <p className="review-muted">No submitted review yet. Choose a baseline to compare snapshots.</p>}

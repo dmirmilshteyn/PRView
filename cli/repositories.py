@@ -19,12 +19,13 @@ def read_workspace(output):
     return {"activeRepository": None, "repositories": []}
 
 
-def register_repository(output, repository):
+def register_repository(output, repository, select):
     from cli.artifacts import write_json
     repository_path(output, repository)
     workspace = read_workspace(output)
     workspace["repositories"] = sorted({item.lower(): item for item in [*workspace["repositories"], repository]}.values(), key=str.lower)
-    workspace["activeRepository"] = repository
+    if select or not workspace["activeRepository"]:
+        workspace["activeRepository"] = repository
     write_json(Path(output) / "workspace.json", workspace)
 
 
@@ -65,9 +66,9 @@ def preserve_legacy_imports(output):
         legacy_comments = output / "comments.json"
         if repository == active_repository and legacy_comments.exists() and not (folder / "comments.json").exists():
             shutil.copy2(legacy_comments, folder / "comments.json")
-        register_repository(output, repository)
+        register_repository(output, repository, False)
     if active_repository:
-        register_repository(output, active_repository)
+        register_repository(output, active_repository, True)
 
 
 @contextmanager

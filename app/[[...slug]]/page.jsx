@@ -1,3 +1,5 @@
+import { readPRSnapshot } from "../../lib/pr-snapshot.js";
+import { approvalStatus } from "../../src/review/approval.js";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -35,7 +37,8 @@ async function loadReviewData(number, repository) {
   // Only active imports are navigable. Stale artifact directories must not
   // make a closed/unsynced stack entry look like a locally available PR.
   const stackPRs = (await Promise.all(Object.values(prs).flat().map(async (pr) => {
-    const details = readJson(path.join(artifactsPath, "pr", String(pr.number), "details.json"), null);
+    let details;
+    try { details = readPRSnapshot(path.join(artifactsPath, "pr", String(pr.number))).details; } catch { return null; }
     if (!details) {
       return null;
     }
@@ -45,15 +48,18 @@ async function loadReviewData(number, repository) {
     pr.author = details.author;
     pr.labels = details.labels ?? [];
     pr.ci = pullRequestCI(details);
+    pr.approval = approvalStatus(details);
+    pr.checkRuns = details.checkRuns;
     pr.mergeConflict = hasMergeConflict(details);
     const review = await readReview(path.join(process.cwd(), ".local-reviews"), details.repository, details.number);
-    return { number: details.number, repository: details.repository, revision: details.revision, mergeConflict: hasMergeConflict(details), reviewProgress: stackReviewProgress(review, details.revision), approved: hasPullRequestApproval(details), ci: pullRequestCI(details), pinned: review.pinned === true };
+    return { number: details.number, repository: details.repository, revision: details.revision, mergeConflict: hasMergeConflict(details), reviewProgress: stackReviewProgress(review, details.revision), approved: hasPullRequestApproval(details), ci: pullRequestCI(details), pinned: review.pinned === true, ignored: review.ignored === true };
   }))).filter(Boolean);
 
   try {
     if (number && /^\d+$/.test(number)) {
-      prDetails[number] = readJson(path.join(artifactsPath, "pr", number, "details.json"), null);
-      prDiffs[number] = readJson(path.join(artifactsPath, "pr", number, "diff.json"), null);
+      const snapshot = readPRSnapshot(path.join(artifactsPath, "pr", number));
+      prDetails[number] = snapshot.details;
+      prDiffs[number] = snapshot.diff;
       const details = prDetails[number];
       const diff = prDiffs[number];
       if (details && diff) {
